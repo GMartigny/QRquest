@@ -3,13 +3,35 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { PNG } from "pngjs";
 import {
-  TILE, COLUMNS, ROWS_PER_THEME, THEMES, N, E, S, W, themeRow,
+  COLUMNS, ROWS_PER_WORLD, ROW, N, E, S, W, GROUND_SLOTS, PROP_SLOTS, LANDMARK_SLOTS, analyzeTileset,
 } from "../src/tileset.js";
+
+// Content of the default sheet. The app does not read this: it discovers worlds,
+// inhabitants and landmarks from the PNG itself (see src/tileset.js).
+const TILE = 16;
+const THEMES = [
+  {
+    id: "forest", label: "Forêt",
+    props: { ground: ["sign", "mushroom", "rabbit"], wall: ["apples", "owl", "cardinal"], "wall-front": [] },
+    landmarks: { 3: ["tavern", "oak"], 2: ["well", "campfire"] },
+  },
+  {
+    id: "dungeon", label: "Donjon",
+    props: { ground: ["skull", "potion", "key"], wall: ["cobweb"], "wall-front": ["torch", "banner"] },
+    landmarks: { 3: ["crypt", "altar"], 2: ["chest", "slime"] },
+  },
+  {
+    id: "snow", label: "Toundra",
+    props: { ground: ["fox", "snowman", "sled"], wall: ["squirrel", "robin"], "wall-front": ["lantern"] },
+    landmarks: { 3: ["igloo", "crevasse"], 2: ["icehole", "rock"] },
+  },
+];
+const themeRow = (t, kind) => t * ROWS_PER_WORLD + ROW[kind];
 import { PROPS } from "./props.mjs";
 import { LANDMARKS, Painter } from "./landmarks.mjs";
 
 const width = TILE * COLUMNS;
-const height = TILE * ROWS_PER_THEME * THEMES.length;
+const height = TILE * ROWS_PER_WORLD * THEMES.length;
 const png = new PNG({ width, height });
 png.data.fill(0);
 
@@ -165,7 +187,8 @@ function groundRow(row, seed, pal, decorate) {
     }
     if (pal.seams) pal.seams(grid, v);
     if (v >= 4) decorate(grid, v - 4, rng);
-    drawTile(v, row, (x, y) => grid[y][x]);
+    const col = v < 4 ? GROUND_SLOTS.plain[0] + v : GROUND_SLOTS.decor[0] + v - 4;
+    drawTile(col, row, (x, y) => grid[y][x]);
   }
 }
 
@@ -283,30 +306,36 @@ function composite(propCol, propRow, baseCol, baseRow, region) {
 
 let bad = 0;
 THEMES.forEach((theme, t) => {
-  theme.props.forEach((prop, col) => {
-    const sprite = PROPS[prop.id];
-    if (!sprite) throw new Error(`Missing sprite ${prop.id}`);
-    drawSprite(col, themeRow(t, "props"), sprite);
-    const ground = prop.slot === "ground";
-    const baseRow = themeRow(t, ground ? "ground" : "wall");
-    const baseCol = ground ? 0 : 15;
-    const full = composite(col, themeRow(t, "props"), baseCol, baseRow, 0);
-    const center = composite(col, themeRow(t, "props"), baseCol, baseRow, 4);
-    const ok = ground ? full > 165 && center > 150 : full < 90 && center < 85;
-    if (!ok) bad++;
-    console.log(`${ok ? "ok  " : "BAD "} ${theme.id}/${prop.id.padEnd(9)} ${prop.slot.padEnd(10)} luma ${full.toFixed(0)} (centre ${center.toFixed(0)})`);
-  });
+  for (const [slot, ids] of Object.entries(theme.props)) {
+    ids.forEach((id, i) => {
+      const col = PROP_SLOTS[slot][0] + i;
+      const sprite = PROPS[id];
+      if (!sprite) throw new Error(`Missing sprite ${id}`);
+      drawSprite(col, themeRow(t, "props"), sprite);
+      const ground = slot === "ground";
+      const baseRow = themeRow(t, ground ? "ground" : "wall");
+      const baseCol = ground ? 0 : 15;
+      const full = composite(col, themeRow(t, "props"), baseCol, baseRow, 0);
+      const center = composite(col, themeRow(t, "props"), baseCol, baseRow, 4);
+      const ok = ground ? full > 165 && center > 150 : full < 90 && center < 85;
+      if (!ok) bad++;
+      console.log(`${ok ? "ok  " : "BAD "} ${theme.id}/${id.padEnd(9)} ${slot.padEnd(10)} luma ${full.toFixed(0)} (centre ${center.toFixed(0)})`);
+    });
+  }
 });
 // ---------- landmarks ----------
 THEMES.forEach((theme, t) => {
-  for (const lm of theme.landmarks) {
-    const draw = LANDMARKS[lm.id];
-    if (!draw) throw new Error(`Missing landmark ${lm.id}`);
-    const p = new Painter(lm.size * TILE, lm.size * TILE);
-    draw(p);
-    p.px.forEach((line, y) => line.forEach((c, x) => {
-      if (c) put(lm.col + Math.floor(x / TILE), themeRow(t, "landmarks") + Math.floor(y / TILE), x % TILE, y % TILE, c);
-    }));
+  for (const size of [3, 2]) {
+    const slots = LANDMARK_SLOTS.filter((sl) => sl.size === size);
+    (theme.landmarks[size] || []).forEach((id, i) => {
+      const draw = LANDMARKS[id];
+      if (!draw || !slots[i]) throw new Error(`Landmark ${id}: sprite or ${size}×${size} slot missing`);
+      const p = new Painter(size * TILE, size * TILE);
+      draw(p);
+      p.px.forEach((line, y) => line.forEach((c, x) => {
+        if (c) put(slots[i].col + Math.floor(x / TILE), themeRow(t, "landmarks") + Math.floor(y / TILE), x % TILE, y % TILE, c);
+      }));
+    });
   }
 });
 
@@ -314,4 +343,11 @@ if (bad) { console.error(`${bad} prop(s) would change their module's colour`); p
 
 mkdirSync(new URL("../public/", import.meta.url), { recursive: true });
 writeFileSync(new URL("../public/tiles.png", import.meta.url), PNG.sync.write(png));
+writeFileSync(new URL("../public/tiles.json", import.meta.url), JSON.stringify({ worlds: THEMES.map((t) => t.label) }, null, 2) + "\n");
+
+// Sanity check: what the app will discover from this sheet
+const found = analyzeTileset(png, { worlds: THEMES.map((t) => t.label) });
+for (const w of found.worlds) {
+  console.log(`${w.label}: ${w.ground.plain.length}+${w.ground.decor.length} sols, ${w.props.length} habitants, ${w.landmarks.length} bâtiments`);
+}
 console.log(`public/tiles.png ${width}×${height}`);

@@ -1,17 +1,25 @@
 // Renders QR maps with the real spritesheet (no browser) and checks they decode
 // with jsQR. Images are box-downscaled to 8, ~5 and 4 px per module to mimic what
 // a phone camera actually captures (pixel-level texture gets averaged out).
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+// Works with any sheet: `node tools/scan-test.mjs [path/to/tiles.png]`.
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { PNG } from "pngjs";
 import jsQR from "jsqr";
 import { buildMap } from "../src/qrmap.js";
-import { TILE, THEMES } from "../src/tileset.js";
+import { analyzeTileset } from "../src/tileset.js";
 
-const sheet = PNG.sync.read(readFileSync(new URL("../public/tiles.png", import.meta.url)));
+const sheetPath = process.argv.slice(2).find((a) => !a.startsWith("--")) || new URL("../public/tiles.png", import.meta.url).pathname;
+const sheet = PNG.sync.read(readFileSync(sheetPath));
+const manifestPath = sheetPath.replace(/\.png$/, ".json");
+const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, "utf8")) : {};
+const tileset = analyzeTileset(sheet, manifest);
+for (const w of tileset.worlds) {
+  console.log(`${w.label}: ${w.ground.plain.length}+${w.ground.decor.length} sols, ${w.props.length} habitants, ${w.landmarks.length} bâtiments`);
+}
 
 function render(map) {
   const out = new PNG({ width: map.size, height: map.size });
-  for (const { sx, sy, dx, dy, w = TILE, h = TILE } of map.ops) {
+  for (const { sx, sy, dx, dy, w, h } of map.ops) {
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const si = ((sy + y) * sheet.width + sx + x) * 4;
       if (sheet.data[si + 3] === 0) continue; // transparent: keep what's below
@@ -32,7 +40,8 @@ function downscale(png, f) {
   return [out, w];
 }
 
-const FACTORS = [2, 3, 4];
+// ~8, ~5 and ~4 px per module whatever the tile size
+const FACTORS = [2, 3, 4].map((f) => Math.max(1, Math.round((f * tileset.tile) / 16)));
 const samples = [
   "https://github.com/GMartigny/QRquest",
   "Bonjour, aventurier ! Ta quête commence ici. ⚔️",
@@ -44,26 +53,26 @@ const outDir = process.argv.includes("--save") ? new URL("../test-output/", impo
 if (outDir) mkdirSync(outDir, { recursive: true });
 
 let failures = 0;
-for (const [t, theme] of THEMES.entries()) {
+for (const [t, theme] of tileset.worlds.entries()) {
   for (const ecl of ["L", "M", "Q", "H"]) {
     for (const [i, text] of samples.entries()) {
       for (const seed of [1, 42]) {
-        const map = buildMap(text, { ecl, theme: t, seed });
+        const map = buildMap(text, { tileset, world: t, ecl, seed });
         const png = render(map);
         for (const f of FACTORS) {
           const [data, w] = downscale(png, f);
           const res = jsQR(data, w, w);
           if (res?.data !== text) {
             failures++;
-            console.log(`FAIL ${theme.id} ecl=${ecl} sample=${i} seed=${seed} v${map.version} ${(16 / f).toFixed(1)}px/module`);
+            console.log(`FAIL ${theme.label} ecl=${ecl} sample=${i} seed=${seed} v${map.version} ${(tileset.tile / f).toFixed(1)}px/module`);
           }
         }
-        if (outDir && seed === 1 && ecl === "Q" && i < 2) writeFileSync(new URL(`${theme.id}-${i}.png`, outDir), PNG.sync.write(png));
+        if (outDir && seed === 1 && ecl === "Q" && i < 2) writeFileSync(new URL(`world${t + 1}-${i}.png`, outDir), PNG.sync.write(png));
       }
     }
   }
 }
-const total = THEMES.length * 4 * samples.length * 2 * FACTORS.length;
+const total = tileset.worlds.length * 4 * samples.length * 2 * FACTORS.length;
 // Landmarks deliberately spend part of the error correction: accept ≥ 99 %.
 const rate = (total - failures) / total;
 console.log(`${total - failures}/${total} QR codes decoded (${(rate * 100).toFixed(1)} %)`);

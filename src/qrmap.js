@@ -1,5 +1,5 @@
 import qrcode from "qrcode-generator";
-import { TILE, N, E, S, W, GROUND_PLAIN, GROUND_DECOR, THEMES, themeRow } from "./tileset.js";
+import { N, E, S, W } from "./tileset.js";
 
 // Encode text as UTF-8 bytes (accents, emoji…) instead of the library's Latin-1 default.
 const encoder = new TextEncoder();
@@ -51,8 +51,7 @@ function forbiddenMap(n, version, special) {
 }
 
 // Picks random spots for landmarks within the module budget; no overlaps.
-function placeLandmarks(n, version, special, { ecl, theme, seed, amount }) {
-  const list = THEMES[theme].landmarks;
+function placeLandmarks(n, version, special, { ecl, list, seed, amount }) {
   let budget = Math.floor(n * n * (LANDMARK_BUDGET[ecl] ?? 0) * amount);
   // sparing: roughly one landmark per dozen modules of width
   let count = Math.max(1, Math.round((n / 12) * amount));
@@ -99,9 +98,17 @@ function specialMap(n, version) {
 
 /**
  * Turns text into a tile map: a list of draw operations from the spritesheet.
- * @returns {{ n:number, version:number, cells:number, size:number, ops:{sx,sy,dx,dy}[] }}
+ * @param {string} text
+ * @param {object} options  tileset: result of analyzeTileset(), world: index in tileset.worlds
+ * @returns {{ n, version, cells, size, ops:{sx,sy,dx,dy,w,h}[], landmarks }}
  */
-export function buildMap(text, { ecl = "Q", quiet = 2, seed = 1, theme = 0, decor = 0.22, props = 0.07, landmarks = 4 } = {}) {
+export function buildMap(text, {
+  tileset, world = 0, ecl = "Q", quiet = 2, seed = 1, decor = 0.22, props = 0.07, landmarks = 4,
+} = {}) {
+  if (!tileset) throw new Error("buildMap: tileset manquant (analyzeTileset)");
+  const T = tileset.tile;
+  const wd = tileset.worlds[Math.min(world, tileset.worlds.length - 1)];
+
   const qr = qrcode(0, ecl);
   qr.addData(text, "Byte");
   qr.make();
@@ -111,16 +118,16 @@ export function buildMap(text, { ecl = "Q", quiet = 2, seed = 1, theme = 0, deco
   const dark = (r, c) => r >= 0 && c >= 0 && r < n && c < n && qr.isDark(r, c);
   const kind = (r, c) => (dark(r, c) ? (special[r][c] ? "special" : "wall") : null);
 
-  const { placed, taken } = placeLandmarks(n, version, special, { ecl, theme, seed, amount: landmarks });
+  const { placed, taken } = placeLandmarks(n, version, special, { ecl, list: wd.landmarks, seed, amount: landmarks });
   const covered = (r, c) => taken && r >= 0 && c >= 0 && r < n && c < n && taken[r][c];
 
   const cells = n + quiet * 2;
   const ops = [];
-  const groundRow = themeRow(theme, "ground");
-  const propRow = themeRow(theme, "props");
-  const propList = THEMES[theme].props.map((p, col) => ({ ...p, col }));
-  const bySlot = (...slots) => propList.filter((p) => slots.includes(p.slot));
+  const tileOp = (col, row, x, y) => ops.push({ sx: col * T, sy: row * T, dx: x * T, dy: y * T, w: T, h: T });
+  const bySlot = (...slots) => wd.props.filter((p) => slots.includes(p.slot));
   const groundProps = bySlot("ground");
+  const { plain, decor: decorated } = wd.ground;
+  const pick = (list, h) => list[Math.floor(h * list.length)];
 
   // Props live on "safe" cells only: a ground prop needs a clearing (4 light
   // neighbours) away from the finder/alignment patterns, a wall-front prop needs
@@ -134,22 +141,20 @@ export function buildMap(text, { ecl = "Q", quiet = 2, seed = 1, theme = 0, deco
   };
   const pickProp = (x, y, candidates) => {
     if (!candidates.length || hash(x + 101, y + 53, seed) >= props) return null;
-    return candidates[Math.floor(hash(y + 7, x + 211, seed) * candidates.length)];
+    return pick(candidates, hash(y + 7, x + 211, seed));
   };
 
   for (let y = 0; y < cells; y++) {
     for (let x = 0; x < cells; x++) {
       const r = y - quiet, c = x - quiet;
       // ground under every cell (rounded wall corners let it show through)
-      const h = hash(x, y, seed);
       const clearing = !kind(r, c) && !kind(r - 1, c) && !kind(r + 1, c) && !kind(r, c - 1) && !kind(r, c + 1)
         && !nearSpecial(r, c) && !covered(r, c);
       const groundProp = clearing ? pickProp(x, y, groundProps) : null;
-      const variant = groundProp ? Math.floor(hash(x + 31, y + 17, seed) * GROUND_PLAIN) : h < decor
-        ? GROUND_PLAIN + Math.floor(hash(y, x, seed + 7) * GROUND_DECOR)
-        : Math.floor(hash(x + 31, y + 17, seed) * GROUND_PLAIN);
-      ops.push({ sx: variant * TILE, sy: groundRow * TILE, dx: x * TILE, dy: y * TILE });
-      if (groundProp) ops.push({ sx: groundProp.col * TILE, sy: propRow * TILE, dx: x * TILE, dy: y * TILE });
+      const useDecor = !groundProp && decorated.length && hash(x, y, seed) < decor;
+      const variant = useDecor ? pick(decorated, hash(y, x, seed + 7)) : pick(plain, hash(x + 31, y + 17, seed));
+      tileOp(variant, wd.rows.ground, x, y);
+      if (groundProp) tileOp(groundProp.col, wd.rows.props, x, y);
 
       const k = kind(r, c);
       if (!k) continue;
@@ -158,29 +163,28 @@ export function buildMap(text, { ecl = "Q", quiet = 2, seed = 1, theme = 0, deco
       if (kind(r, c + 1) === k) mask |= E;
       if (kind(r + 1, c) === k) mask |= S;
       if (kind(r, c - 1) === k) mask |= W;
-      ops.push({ sx: mask * TILE, sy: themeRow(theme, k) * TILE, dx: x * TILE, dy: y * TILE });
+      tileOp(mask, wd.rows[k], x, y);
 
       if (k === "wall" && !covered(r, c)) {
         const wallProp = pickProp(x, y, bySlot("wall", ...(mask & S ? [] : ["wall-front"])));
-        if (wallProp) ops.push({ sx: wallProp.col * TILE, sy: propRow * TILE, dx: x * TILE, dy: y * TILE });
+        if (wallProp) tileOp(wallProp.col, wd.rows.props, x, y);
       }
     }
   }
 
   // landmarks on top of everything, regardless of the modules underneath
-  const lmRow = themeRow(theme, "landmarks");
   for (const lm of placed) {
-    const size = lm.size * TILE;
-    ops.push({ sx: lm.col * TILE, sy: lmRow * TILE, dx: (lm.c + quiet) * TILE, dy: (lm.r + quiet) * TILE, w: size, h: size });
+    const size = lm.size * T;
+    ops.push({ sx: lm.col * T, sy: wd.rows.landmarks * T, dx: (lm.c + quiet) * T, dy: (lm.r + quiet) * T, w: size, h: size });
   }
-  return { n, version, cells, size: cells * TILE, ops, landmarks: placed.map(({ id, label, r, c }) => ({ id, label, r, c })) };
+  return { n, version, cells, size: cells * T, ops, landmarks: placed.map(({ col, size, r, c }) => ({ col, size, r, c })) };
 }
 
 /** Draws a map onto a 2D canvas context at an integer pixel scale. */
 export function drawMap(ctx, map, sheet, scale = 1) {
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, map.size * scale, map.size * scale);
-  for (const { sx, sy, dx, dy, w = TILE, h = TILE } of map.ops) {
+  for (const { sx, sy, dx, dy, w, h } of map.ops) {
     ctx.drawImage(sheet, sx, sy, w, h, dx * scale, dy * scale, w * scale, h * scale);
   }
 }

@@ -14,8 +14,6 @@
   color: var(--ink);
   background: var(--bg);
 }
-body[data-theme="dungeon"] { --theme: #b49cff; }
-body[data-theme="snow"] { --theme: #8fd6ff; }
 
 * { box-sizing: border-box; }
 

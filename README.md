@@ -17,22 +17,38 @@ npm run tiles    # régénère public/tiles.png
 - `src/qrmap.js` encode le texte (UTF-8) avec `qrcode-generator`, puis transforme la matrice en opérations de dessin : une tuile de sol sous chaque case, et pour chaque module sombre une tuile de mur choisie selon ses voisins (masque N=1, E=2, S=4, O=8 → 16 variantes).
 - Les motifs de repérage (coins) et d'alignement utilisent une famille de tuiles « spéciale » (ruines, obsidienne, glace).
 - Le sol varie aléatoirement (graine relançable) avec quelques décorations.
-- Chaque monde a ses habitants (ligne 3 du tileset) : panneau, champignon, lapin, chouette… en forêt ; crâne, potion, clé, torche, bannière, toile d’araignée au donjon ; renard blanc, bonhomme de neige, luge, lanterne, écureuil, rouge-gorge en toundra. Ils sont placés au hasard sur des cases sûres : clairière (sol entouré de sol, loin des motifs de repérage), mur, ou façade de mur (rien en dessous). `npm run tiles` vérifie qu’aucun ne change la luminosité de sa case.
+- Chaque monde a ses habitants : panneau, champignon, lapin, chouette… en forêt ; crâne, potion, clé, torche, bannière, toile d’araignée au donjon ; renard blanc, bonhomme de neige, luge, lanterne, écureuil, rouge-gorge en toundra. Ils sont placés au hasard sur des cases sûres : clairière (sol entouré de sol, loin des motifs de repérage), mur, ou façade de mur (rien en dessous). `npm run tiles` vérifie qu’aucun ne change la luminosité de sa case.
 - Quelques bâtiments 2×2 ou 3×3 (taverne, grand chêne, puits, feu de camp ; crypte, autel, coffre, slime ; igloo, crevasse, trou de pêche, rocher) sont posés n’importe où, sans tenir compte des modules dessous : c’est la correction d’erreur qui compense. Ils évitent seulement ce que le décodeur lit hors correction (repérage + format, lignes de timing, alignement, version) et respectent un budget de modules par niveau. En moyenne ils couvrent ~1,5 % des modules en L, ~3,7 % en M, ~5,5 % en Q et ~4,9 % en H, pour ~99,5 % de QR lus par jsQR en L et M, 100 % en Q et H.
 
 ## Tileset
 
-`public/tiles.png` est généré par `tools/generate-tiles.mjs` et placé dans le domaine public (CC0). Pour un tileset maison, respecter le format décrit dans `src/tileset.js` :
+Le tileset se remplace sans toucher au code : déposer un autre `public/tiles.png` (et éventuellement `public/tiles.json`). L'application lit l'image et en déduit tout le reste :
 
-| Ligne (par thème) | Contenu |
+- **taille des tuiles** = largeur ÷ 16 (16 px, 32 px…) ;
+- **nombre de mondes** = hauteur ÷ (7 × taille de tuile) — une bande de 7 rangées par monde ;
+- **sols, habitants et bâtiments** : chaque case est un emplacement, utilisé seulement s'il n'est pas entièrement transparent. Chaque monde peut donc en avoir un nombre différent.
+
+Organisation d'une bande (colonnes 0 à 15) :
+
+| Rangée | Contenu |
 | --- | --- |
-| 0 | 16 tuiles de mur, index = masque des voisins |
-| 1 | 16 tuiles « spéciales » (motifs de repérage), même masque |
-| 2 | sol : 4 variantes simples puis 4 décorées |
-| 3 | habitants, dans l’ordre de `props` du thème |
-| 4-6 | bâtiments 2×2 / 3×3, de gauche à droite dans l’ordre de `landmarks` |
+| 0 | **murs (obligatoire)** : 16 tuiles, colonne = masque des voisins (N=1, E=2, S=4, O=8) |
+| 1 | murs « spéciaux » des carrés de repérage, mêmes masques (rangée vide → murs normaux) |
+| 2 | sol : colonnes 0-7 variantes simples (au moins une), 8-15 variantes décorées |
+| 3 | habitants : colonnes 0-7 sur le sol, 8-11 sur un mur, 12-15 sur une façade de mur (rien en dessous) |
+| 4-6 | bâtiments : emplacements 3×3 aux colonnes 0, 3 et 6 ; emplacements 2×2 aux colonnes 9, 11 et 13 (rangées 4-5) |
 
-Tuiles de 16×16 px. Les coins arrondis sont transparents pour laisser voir le sol. Garder des murs sombres et un sol clair : c'est ce contraste qui rend le QR scannable.
+Noms des mondes (optionnel, sinon « Monde 1 », « Monde 2 »…) dans `public/tiles.json` :
+
+```json
+{ "worlds": ["Forêt", "Donjon", "Toundra"] }
+```
+
+La couleur d'accent de l'interface est tirée de la couleur des murs de chaque monde.
+
+Pour vérifier un tileset maison : `node tools/scan-test.mjs chemin/vers/tiles.png` affiche ce qui a été détecté et le taux de QR lus. Garder des murs sombres, un sol clair et des habitants qui respectent la luminosité de leur case : c'est ce contraste qui rend le QR scannable.
+
+Le tileset par défaut est généré par `npm run tiles` (`tools/generate-tiles.mjs`) et placé dans le domaine public (CC0).
 
 ## Licence
 
