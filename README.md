@@ -44,6 +44,8 @@ Noms des mondes (optionnel, sinon « Monde 1 », « Monde 2 »…) dans `public/
 { "worlds": ["Forêt", "Donjon", "Toundra"] }
 ```
 
+La transparence partielle (canal alpha) est prise en compte, par exemple pour un slime ou de la glace.
+
 La couleur d'accent de l'interface est tirée de la couleur des murs de chaque monde.
 
 Pour vérifier un tileset maison : `node tools/scan-test.mjs chemin/vers/tiles.png` affiche ce qui a été détecté et le taux de QR lus. Garder des murs sombres, un sol clair et des habitants qui respectent la luminosité de leur case : c'est ce contraste qui rend le QR scannable.

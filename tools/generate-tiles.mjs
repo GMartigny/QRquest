@@ -44,14 +44,15 @@ function mulberry32(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+// "#rrggbb" or "#rrggbbaa" (partial transparency)
+const hex = (h) => [1, 3, 5, 7].map((i) => (i < h.length ? parseInt(h.slice(i, i + 2), 16) : 255));
 const pick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
 
 function put(col, row, x, y, color) {
   if (!color || x < 0 || y < 0 || x >= TILE || y >= TILE) return;
-  const [r, g, b] = hex(color);
+  const [r, g, b, a] = hex(color);
   const i = ((row * TILE + y) * width + col * TILE + x) * 4;
-  png.data[i] = r; png.data[i + 1] = g; png.data[i + 2] = b; png.data[i + 3] = 255;
+  png.data[i] = r; png.data[i + 1] = g; png.data[i + 2] = b; png.data[i + 3] = a;
 }
 
 // Tile grid -> function(x, y) -> color|null

@@ -47,6 +47,12 @@ export class Painter {
   shade(pred, c) {
     for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) if (this.px[y][x] && pred(x, y, this.px[y][x])) this.px[y][x] = c;
   }
+  // Draw with another painter, keeping only what lands on empty pixels (glows, halos)
+  behind(draw) {
+    const layer = new Painter(this.w, this.h);
+    draw(layer);
+    layer.px.forEach((line, y) => line.forEach((c, x) => { if (c && !this.px[y][x]) this.px[y][x] = c; }));
+  }
   // 1px outline around every opaque pixel
   outline(c) {
     const add = [];
@@ -161,15 +167,18 @@ export const LANDMARKS = {
     // cloth
     p.rect(16, 27, 16, 12, "#7e1e2c"); p.poly([[16, 39], [24, 44], [32, 39]], "#7e1e2c");
     p.rect(16, 27, 16, 1, "#c89a3c"); p.rect(23, 30, 2, 6, "#c89a3c"); p.rect(21, 32, 6, 2, "#c89a3c");
-    // orb
-    p.circle(24, 15, 6, "#7c4ed8"); p.circle(23, 14, 4, "#b07cff"); p.rect(21, 12, 2, 2, "#f0e0ff");
+    // glass orb: translucent, with a bright core and a solid highlight
     p.rect(20, 21, 9, 2, "#c89a3c");
+    p.circle(24, 15, 6, "#7c4ed8b8"); p.circle(24, 15, 4, "#b07cffa0"); p.circle(25, 16, 2, "#e6d4ffd0");
+    p.rect(21, 12, 2, 2, "#ffffff");
     // candles
     for (const x of [10, 15, 33, 38]) {
       const h = x === 15 || x === 33 ? 7 : 5;
       p.rect(x, 23 - h, 2, h, "#f2ead8"); p.rect(x, 21 - h, 2, 2, "#ffb030"); p.set(x, 20 - h, "#fff3b0");
     }
     p.outline("#0c0a12");
+    // soft magic glow around the orb, outside the outline
+    p.behind((g) => { g.circle(24, 15, 10, "#b07cff30"); g.circle(24, 15, 8.5, "#b07cff50"); });
   },
   chest(p) {
     // Kept free of nested dark/light bands: those can fool a scanner into seeing
@@ -184,14 +193,16 @@ export const LANDMARKS = {
     p.outline("#2a1a10");
   },
   slime(p) {
-    p.ellipse(16, 26, 13, 4, "#3f9a48");
-    p.ellipse(16, 24, 13, 13, "#6cd36b", { bottom: false });
-    p.rect(3, 24, 27, 4, "#6cd36b");
-    p.ellipse(16, 27, 13, 2, "#3f9a48", { top: false });
-    p.ellipse(11, 15, 3, 4, "#b8f0a0"); p.set(10, 13, "#ffffff");
+    // translucent jelly: the map shows through, the eyes and shine stay solid
+    p.ellipse(16, 26, 13, 4, "#3f9a48c8");
+    p.ellipse(16, 24, 13, 13, "#6cd36b99", { bottom: false });
+    p.rect(3, 24, 27, 4, "#6cd36b99");
+    p.ellipse(16, 27, 13, 2, "#3f9a48c8", { top: false });
+    p.circle(22, 17, 1.5, "#b8f0a0c0"); p.circle(8, 22, 1, "#b8f0a0c0");
+    p.ellipse(11, 15, 3, 4, "#d8ffc8e0"); p.set(10, 13, "#ffffff");
     p.rect(12, 20, 2, 3, "#111111"); p.rect(19, 20, 2, 3, "#111111"); p.set(12, 20, "#ffffff"); p.set(19, 20, "#ffffff");
     p.rect(15, 24, 3, 1, "#2a6a30");
-    p.outline("#14301a");
+    p.outline("#14301acc");
   },
 
   // ---------------- snow ----------------
@@ -210,9 +221,10 @@ export const LANDMARKS = {
   crevasse(p) {
     const path = [[3, 8], [10, 14], [8, 20], [17, 24], [16, 31], [26, 31], [30, 38], [38, 37], [45, 44]];
     const widths = [1, 3, 4, 6, 5, 6, 4, 3, 1];
-    // icy lip
-    for (let i = 0; i + 1 < path.length; i++) p.line(...path[i], ...path[i + 1], "#a9d2f0", widths[i] + 4);
-    for (let i = 0; i + 1 < path.length; i++) p.line(...path[i], ...path[i + 1], "#5e8fbe", widths[i] + 2);
+    // translucent icy lip fading into the snow, then the dark depths
+    for (let i = 0; i + 1 < path.length; i++) p.line(...path[i], ...path[i + 1], "#a9d2f060", widths[i] + 6);
+    for (let i = 0; i + 1 < path.length; i++) p.line(...path[i], ...path[i + 1], "#7fb6e0a0", widths[i] + 4);
+    for (let i = 0; i + 1 < path.length; i++) p.line(...path[i], ...path[i + 1], "#5e8fbee0", widths[i] + 2);
     for (let i = 0; i + 1 < path.length; i++) p.line(...path[i], ...path[i + 1], "#1a2a44", widths[i]);
     // side cracks
     p.line(17, 24, 24, 18, "#1a2a44"); p.line(30, 38, 29, 45, "#1a2a44"); p.line(8, 20, 2, 23, "#1a2a44");
@@ -220,7 +232,7 @@ export const LANDMARKS = {
     for (const [x, y] of [[22, 22], [34, 33], [12, 26]]) { p.rect(x, y, 2, 2, "#ffffff"); p.set(x + 2, y + 1, "#d6ecff"); }
   },
   icehole(p) {
-    p.ellipse(15, 20, 14, 9, "#bfe0f5"); p.ellipse(15, 19, 13, 8, "#d8eefc");
+    p.ellipse(15, 20, 14, 9, "#bfe0f5b0"); p.ellipse(15, 19, 13, 8, "#d8eefcc0");
     p.ellipse(15, 20, 9, 5, "#1e3a5a"); p.ellipse(13, 19, 3, 1.5, "#3c6890");
     // rod + line
     p.line(30, 3, 22, 13, "#8a6a40", 2); p.line(22, 13, 17, 21, "#e8e8e8");

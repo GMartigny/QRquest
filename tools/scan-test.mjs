@@ -22,9 +22,11 @@ function render(map) {
   for (const { sx, sy, dx, dy, w, h } of map.ops) {
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const si = ((sy + y) * sheet.width + sx + x) * 4;
-      if (sheet.data[si + 3] === 0) continue; // transparent: keep what's below
+      const a = sheet.data[si + 3] / 255;
+      if (!a) continue; // transparent: keep what's below
       const di = ((dy + y) * map.size + dx + x) * 4;
-      sheet.data.copy(out.data, di, si, si + 4);
+      for (let k = 0; k < 3; k++) out.data[di + k] = Math.round(sheet.data[si + k] * a + out.data[di + k] * (1 - a));
+      out.data[di + 3] = 255;
     }
   }
   return out;
