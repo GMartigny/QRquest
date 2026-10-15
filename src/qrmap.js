@@ -185,12 +185,3 @@ export function buildMap(text, {
   }
   return { n, version, cells, size: cells * T, ops, landmarks: placed.map(({ col, size, r, c }) => ({ col, size, r, c })) };
 }
-
-/** Draws a map onto a 2D canvas context at an integer pixel scale. */
-export function drawMap(ctx, map, sheet, scale = 1) {
-  ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, map.size * scale, map.size * scale);
-  for (const { sx, sy, dx, dy, w, h } of map.ops) {
-    ctx.drawImage(sheet, sx, sy, w, h, dx * scale, dy * scale, w * scale, h * scale);
-  }
-}

@@ -3,12 +3,10 @@ import "./style.css";
 import { analyzeTileset } from "./tileset.js";
 
 const $ = (sel) => document.querySelector(sel);
-const canvas = $("#qr");
-const ctx = canvas.getContext("2d");
+const preview = $("#qr");
 const textEl = $("#text");
 const errorEl = $("#error");
 const worldsEl = $("#themes");
-const PREVIEW_SCALE = 1; // strict ×1 preview (CSS only shrinks it when space runs out)
 const API = "/api/qr";
 const MAX_UPLOAD = 4 * 1024 * 1024; // the API refuses bigger tilesets
 
@@ -102,19 +100,19 @@ async function render() {
   pending?.abort();
   const controller = (pending = new AbortController());
   try {
-    const res = await request(PREVIEW_SCALE, controller.signal);
+    const res = await request(1, controller.signal); // strict ×1, CSS only shrinks it when space runs out
     if (!res.ok) return showError(await readError(res));
-    const bitmap = await createImageBitmap(await res.blob());
-    if (controller.signal.aborted) return;
+    const url = URL.createObjectURL(await res.blob());
+    if (controller.signal.aborted) return URL.revokeObjectURL(url);
     showError("");
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    canvas.style.setProperty("--qr-size", `${bitmap.width / PREVIEW_SCALE}px`);
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(bitmap, 0, 0);
-    canvas.classList.add("on"); // first draw switches the "CRT" on (animation runs once)
+    const previous = preview.src;
+    preview.src = url;
+    await preview.decode().catch(() => {});
+    if (previous.startsWith("blob:")) URL.revokeObjectURL(previous);
+    preview.style.setProperty("--qr-size", `${preview.naturalWidth}px`);
+    preview.classList.add("on"); // first image switches the "CRT" on (animation runs once)
     state.rendered = true;
-    canvas.setAttribute("aria-label", `QR code : ${text}`);
+    preview.alt = `QR code : ${text}`;
     const n = res.headers.get("X-QR-Modules");
     $("#hud-level").textContent = `NIV. ${res.headers.get("X-QR-Version")}`;
     $("#hud-size").textContent = `${n}×${n}`;
