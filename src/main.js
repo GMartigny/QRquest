@@ -92,6 +92,7 @@ function render() {
   canvas.width = canvas.height = map.size * PREVIEW_SCALE;
   canvas.style.setProperty("--qr-size", `${map.size}px`);
   drawMap(ctx, map, sheet, PREVIEW_SCALE);
+  canvas.classList.add("on"); // first draw switches the "CRT" on (animation runs once)
   canvas.setAttribute("aria-label", `QR code : ${text}`);
   $("#hud-level").textContent = `NIV. ${map.version}`;
   $("#hud-size").textContent = `${map.n}×${map.n}`;

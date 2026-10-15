@@ -154,10 +154,24 @@ button.primary:hover { background: #ffd977; }
 footer { text-align: center; font-size: 8px; color: var(--muted); line-height: 1.8; }
 footer a { color: var(--theme); }
 
+/* CRT power-on: thin bright line, vertical expand, quick flicker */
+#qr:not(.on) { opacity: 0; }
+#qr.on { animation: crt-on 0.75s cubic-bezier(0.2, 0.7, 0.3, 1) both; transform-origin: center; }
+@keyframes crt-on {
+  0%   { transform: scale(0.6, 0.004); filter: brightness(4) saturate(0); opacity: 1; }
+  14%  { transform: scale(1, 0.004);   filter: brightness(4) saturate(0); opacity: 1; }
+  32%  { transform: scale(1, 1);       filter: brightness(2.6) saturate(0.4); opacity: 1; }
+  42%  { opacity: 0.25; }
+  52%  { opacity: 1; filter: brightness(1.7) saturate(0.8); }
+  62%  { opacity: 0.45; }
+  74%  { opacity: 1; filter: brightness(1.25); }
+  100% { transform: none; filter: none; opacity: 1; }
+}
+
 @keyframes blink { to { visibility: hidden; } }
 @keyframes bob { 50% { transform: translateY(3px); } }
 @media (prefers-reduced-motion: reduce) {
-  .press, .caret { animation: none; }
+  .press, .caret, #qr.on { animation: none; }
 }
 
 /* ---------- desktop: options to the right of the map ---------- */
