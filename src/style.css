@@ -148,3 +148,24 @@ footer a { color: var(--theme); }
 @media (prefers-reduced-motion: reduce) {
   .press, .caret { animation: none; }
 }
+
+/* ---------- desktop: options to the right of the map ---------- */
+@media (min-width: 1000px) {
+  .console {
+    width: min(100%, 1640px);
+    display: grid;
+    grid-template-columns: minmax(0, max-content) 380px;
+    grid-template-areas:
+      "title  title"
+      "screen dialog"
+      "footer footer";
+    justify-content: center;
+    align-items: start;
+    column-gap: 36px;
+    row-gap: 28px;
+  }
+  .title { grid-area: title; }
+  .screen { grid-area: screen; align-self: start; max-width: 100%; }
+  .dialog { grid-area: dialog; position: sticky; top: 24px; }
+  footer { grid-area: footer; }
+}
