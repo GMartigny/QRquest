@@ -11,8 +11,8 @@ const sheet = PNG.sync.read(readFileSync(new URL("../public/tiles.png", import.m
 
 function render(map) {
   const out = new PNG({ width: map.size, height: map.size });
-  for (const { sx, sy, dx, dy } of map.ops) {
-    for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) {
+  for (const { sx, sy, dx, dy, w = TILE, h = TILE } of map.ops) {
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const si = ((sy + y) * sheet.width + sx + x) * 4;
       if (sheet.data[si + 3] === 0) continue; // transparent: keep what's below
       const di = ((dy + y) * map.size + dx + x) * 4;
@@ -48,7 +48,7 @@ for (const [t, theme] of THEMES.entries()) {
   for (const ecl of ["L", "M", "Q", "H"]) {
     for (const [i, text] of samples.entries()) {
       for (const seed of [1, 42]) {
-        const map = buildMap(text, { ecl, theme: t, seed, props: seed === 42 ? 0.15 : 0.07 });
+        const map = buildMap(text, { ecl, theme: t, seed });
         const png = render(map);
         for (const f of FACTORS) {
           const [data, w] = downscale(png, f);

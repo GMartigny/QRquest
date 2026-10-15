@@ -18,6 +18,7 @@ npm run tiles    # régénère public/tiles.png
 - Les motifs de repérage (coins) et d'alignement utilisent une famille de tuiles « spéciale » (ruines, obsidienne, glace).
 - Le sol varie aléatoirement (graine relançable) avec quelques décorations.
 - Chaque monde a ses habitants (ligne 3 du tileset) : panneau, champignon, lapin, chouette… en forêt ; crâne, potion, clé, torche, bannière, toile d’araignée au donjon ; renard blanc, bonhomme de neige, luge, lanterne, écureuil, rouge-gorge en toundra. Ils sont placés au hasard sur des cases sûres : clairière (sol entouré de sol, loin des motifs de repérage), mur, ou façade de mur (rien en dessous). `npm run tiles` vérifie qu’aucun ne change la luminosité de sa case.
+- Quelques bâtiments 2×2 ou 3×3 (taverne, grand chêne, puits, feu de camp ; crypte, autel, coffre, slime ; igloo, crevasse, trou de pêche, rocher) sont posés n’importe où, sans tenir compte des modules dessous : c’est la correction d’erreur qui compense. Ils évitent seulement ce que le décodeur lit hors correction (repérage + format, lignes de timing, alignement, version) et respectent un budget de modules par niveau : aucun en L, ~1 % en M, ~2 % en Q, ~2,8 % en H.
 
 ## Tileset
 
@@ -29,6 +30,7 @@ npm run tiles    # régénère public/tiles.png
 | 1 | 16 tuiles « spéciales » (motifs de repérage), même masque |
 | 2 | sol : 4 variantes simples puis 4 décorées |
 | 3 | habitants, dans l’ordre de `props` du thème |
+| 4-6 | bâtiments 2×2 / 3×3, de gauche à droite dans l’ordre de `landmarks` |
 
 Tuiles de 16×16 px. Les coins arrondis sont transparents pour laisser voir le sol. Garder des murs sombres et un sol clair : c'est ce contraste qui rend le QR scannable.
 

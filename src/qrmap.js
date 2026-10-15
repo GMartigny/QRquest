@@ -25,6 +25,62 @@ function hash(x, y, seed) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
+// Share of the symbol's modules that landmarks may cover, by error correction
+// level. Kept well under each level's recovery capacity (7/15/25/30 %) because a
+// covered module can spoil a whole 8-module codeword.
+const LANDMARK_BUDGET = { L: 0, M: 0.01, Q: 0.02, H: 0.028 };
+
+function mulberry32(seed) {
+  return () => {
+    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Modules the decoder needs outside the error correction: finder patterns with
+// their separators and format info, timing lines, alignment and version info.
+function forbiddenMap(n, version, special) {
+  const no = Array.from({ length: n }, (_, r) => Array.from({ length: n }, (_, c) => (
+    (r < 9 && c < 9) || (r < 9 && c >= n - 8) || (r >= n - 8 && c < 9)
+    || r === 6 || c === 6 || special[r][c]
+    || (version >= 7 && ((r < 6 && c >= n - 11 && c < n - 8) || (c < 6 && r >= n - 11 && r < n - 8)))
+  )));
+  return no;
+}
+
+// Picks random spots for landmarks within the module budget; no overlaps.
+function placeLandmarks(n, version, special, { ecl, theme, seed, amount }) {
+  const list = THEMES[theme].landmarks;
+  let budget = Math.floor(n * n * (LANDMARK_BUDGET[ecl] ?? 0) * amount);
+  // sparing: roughly one landmark per dozen modules of width
+  let count = Math.max(1, Math.round((n / 12) * amount));
+  if (!list.length || budget < 4) return { placed: [], taken: null };
+  const forbidden = forbiddenMap(n, version, special);
+  const taken = Array.from({ length: n }, () => new Array(n).fill(false));
+  const rng = mulberry32(seed * 7919 + 13);
+  const placed = [];
+  for (let tries = 0; tries < 400 && budget >= 4 && count > 0; tries++) {
+    const fits = list.filter((lm) => lm.size * lm.size <= budget);
+    if (!fits.length) break;
+    const lm = fits[Math.floor(rng() * fits.length)];
+    const r0 = Math.floor(rng() * (n - lm.size + 1)), c0 = Math.floor(rng() * (n - lm.size + 1));
+    let ok = true;
+    for (let r = r0 - 1; ok && r <= r0 + lm.size; r++) for (let c = c0 - 1; ok && c <= c0 + lm.size; c++) {
+      if (r < 0 || c < 0 || r >= n || c >= n) continue;
+      const inside = r >= r0 && c >= c0 && r < r0 + lm.size && c < c0 + lm.size;
+      if (taken[r][c] || (inside && forbidden[r][c])) ok = false;
+    }
+    if (!ok) continue;
+    for (let r = r0; r < r0 + lm.size; r++) for (let c = c0; c < c0 + lm.size; c++) taken[r][c] = true;
+    placed.push({ ...lm, r: r0, c: c0 });
+    budget -= lm.size * lm.size;
+    count--;
+  }
+  return { placed, taken };
+}
+
 // Which modules belong to finder / alignment patterns (rendered with the "special" tiles).
 function specialMap(n, version) {
   const special = Array.from({ length: n }, () => new Array(n).fill(false));
@@ -45,7 +101,7 @@ function specialMap(n, version) {
  * Turns text into a tile map: a list of draw operations from the spritesheet.
  * @returns {{ n:number, version:number, cells:number, size:number, ops:{sx,sy,dx,dy}[] }}
  */
-export function buildMap(text, { ecl = "Q", quiet = 2, seed = 1, theme = 0, decor = 0.22, props = 0.07 } = {}) {
+export function buildMap(text, { ecl = "Q", quiet = 2, seed = 1, theme = 0, decor = 0.22, props = 0.07, landmarks = 1 } = {}) {
   const qr = qrcode(0, ecl);
   qr.addData(text, "Byte");
   qr.make();
@@ -54,6 +110,9 @@ export function buildMap(text, { ecl = "Q", quiet = 2, seed = 1, theme = 0, deco
   const special = specialMap(n, version);
   const dark = (r, c) => r >= 0 && c >= 0 && r < n && c < n && qr.isDark(r, c);
   const kind = (r, c) => (dark(r, c) ? (special[r][c] ? "special" : "wall") : null);
+
+  const { placed, taken } = placeLandmarks(n, version, special, { ecl, theme, seed, amount: landmarks });
+  const covered = (r, c) => taken && r >= 0 && c >= 0 && r < n && c < n && taken[r][c];
 
   const cells = n + quiet * 2;
   const ops = [];
@@ -84,7 +143,7 @@ export function buildMap(text, { ecl = "Q", quiet = 2, seed = 1, theme = 0, deco
       // ground under every cell (rounded wall corners let it show through)
       const h = hash(x, y, seed);
       const clearing = !kind(r, c) && !kind(r - 1, c) && !kind(r + 1, c) && !kind(r, c - 1) && !kind(r, c + 1)
-        && !nearSpecial(r, c);
+        && !nearSpecial(r, c) && !covered(r, c);
       const groundProp = clearing ? pickProp(x, y, groundProps) : null;
       const variant = groundProp ? Math.floor(hash(x + 31, y + 17, seed) * GROUND_PLAIN) : h < decor
         ? GROUND_PLAIN + Math.floor(hash(y, x, seed + 7) * GROUND_DECOR)
@@ -101,20 +160,27 @@ export function buildMap(text, { ecl = "Q", quiet = 2, seed = 1, theme = 0, deco
       if (kind(r, c - 1) === k) mask |= W;
       ops.push({ sx: mask * TILE, sy: themeRow(theme, k) * TILE, dx: x * TILE, dy: y * TILE });
 
-      if (k === "wall") {
+      if (k === "wall" && !covered(r, c)) {
         const wallProp = pickProp(x, y, bySlot("wall", ...(mask & S ? [] : ["wall-front"])));
         if (wallProp) ops.push({ sx: wallProp.col * TILE, sy: propRow * TILE, dx: x * TILE, dy: y * TILE });
       }
     }
   }
-  return { n, version, cells, size: cells * TILE, ops };
+
+  // landmarks on top of everything, regardless of the modules underneath
+  const lmRow = themeRow(theme, "landmarks");
+  for (const lm of placed) {
+    const size = lm.size * TILE;
+    ops.push({ sx: lm.col * TILE, sy: lmRow * TILE, dx: (lm.c + quiet) * TILE, dy: (lm.r + quiet) * TILE, w: size, h: size });
+  }
+  return { n, version, cells, size: cells * TILE, ops, landmarks: placed.map(({ id, label, r, c }) => ({ id, label, r, c })) };
 }
 
 /** Draws a map onto a 2D canvas context at an integer pixel scale. */
 export function drawMap(ctx, map, sheet, scale = 1) {
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, map.size * scale, map.size * scale);
-  for (const { sx, sy, dx, dy } of map.ops) {
-    ctx.drawImage(sheet, sx, sy, TILE, TILE, dx * scale, dy * scale, TILE * scale, TILE * scale);
+  for (const { sx, sy, dx, dy, w = TILE, h = TILE } of map.ops) {
+    ctx.drawImage(sheet, sx, sy, w, h, dx * scale, dy * scale, w * scale, h * scale);
   }
 }

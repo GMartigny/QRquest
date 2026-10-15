@@ -17,7 +17,6 @@ const store = {
 const state = {
   theme: Math.min(Number(store.get("theme", 0)) || 0, THEMES.length - 1),
   ecl: store.get("ecl", "Q"),
-  props: store.get("props", "0.07"),
   seed: 1,
   map: null,
 };
@@ -39,7 +38,6 @@ THEMES.forEach((t, i) => {
 function syncButtons() {
   themesEl.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", Number(b.dataset.theme) === state.theme));
   $("#ecl").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.ecl === state.ecl));
-  $("#props").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.props === state.props));
   document.body.dataset.theme = THEMES[state.theme].id;
 }
 
@@ -53,7 +51,7 @@ function render() {
     return;
   }
   try {
-    state.map = buildMap(text, { ecl: state.ecl, theme: state.theme, seed: state.seed, props: Number(state.props) });
+    state.map = buildMap(text, { ecl: state.ecl, theme: state.theme, seed: state.seed });
   } catch {
     errorEl.textContent = "Message trop long pour ce niveau de résistance.";
     errorEl.hidden = false;
@@ -68,7 +66,6 @@ function render() {
   store.set("text", text);
   store.set("theme", state.theme);
   store.set("ecl", state.ecl);
-  store.set("props", state.props);
 }
 
 sheet.addEventListener("load", render);
@@ -86,14 +83,6 @@ $("#ecl").addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b) return;
   state.ecl = b.dataset.ecl;
-  syncButtons();
-  render();
-});
-
-$("#props").addEventListener("click", (e) => {
-  const b = e.target.closest("button");
-  if (!b) return;
-  state.props = b.dataset.props;
   syncButtons();
   render();
 });

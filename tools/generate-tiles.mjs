@@ -6,6 +6,7 @@ import {
   TILE, COLUMNS, ROWS_PER_THEME, THEMES, N, E, S, W, themeRow,
 } from "../src/tileset.js";
 import { PROPS } from "./props.mjs";
+import { LANDMARKS, Painter } from "./landmarks.mjs";
 
 const width = TILE * COLUMNS;
 const height = TILE * ROWS_PER_THEME * THEMES.length;
@@ -296,6 +297,19 @@ THEMES.forEach((theme, t) => {
     console.log(`${ok ? "ok  " : "BAD "} ${theme.id}/${prop.id.padEnd(9)} ${prop.slot.padEnd(10)} luma ${full.toFixed(0)} (centre ${center.toFixed(0)})`);
   });
 });
+// ---------- landmarks ----------
+THEMES.forEach((theme, t) => {
+  for (const lm of theme.landmarks) {
+    const draw = LANDMARKS[lm.id];
+    if (!draw) throw new Error(`Missing landmark ${lm.id}`);
+    const p = new Painter(lm.size * TILE, lm.size * TILE);
+    draw(p);
+    p.px.forEach((line, y) => line.forEach((c, x) => {
+      if (c) put(lm.col + Math.floor(x / TILE), themeRow(t, "landmarks") + Math.floor(y / TILE), x % TILE, y % TILE, c);
+    }));
+  }
+});
+
 if (bad) { console.error(`${bad} prop(s) would change their module's colour`); process.exit(1); }
 
 mkdirSync(new URL("../public/", import.meta.url), { recursive: true });
