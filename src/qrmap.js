@@ -1,5 +1,5 @@
 import qrcode from "qrcode-generator";
-import { N, E, S, W } from "./tileset.js";
+import { N, E, S, W, wallSlot } from "./tileset.js";
 
 // Encode text as UTF-8 bytes (accents, emoji…) instead of the library's Latin-1 default.
 const encoder = new TextEncoder();
@@ -141,10 +141,11 @@ export function buildMap(text, {
     return pick(candidates, hash(y + 7, x + 211, seed));
   };
 
+  // Pass 1: ground everywhere (+ inhabitants of clearings). Walls come after so
+  // their semi-transparent spill-over (cast shadows) lands on finished ground.
   for (let y = 0; y < cells; y++) {
     for (let x = 0; x < cells; x++) {
       const r = y - quiet, c = x - quiet;
-      // ground under every cell (rounded wall corners let it show through)
       const clearing = !kind(r, c) && !kind(r - 1, c) && !kind(r + 1, c) && !kind(r, c - 1) && !kind(r, c + 1)
         && !nearSpecial(r, c) && !covered(r, c);
       const groundProp = clearing ? pickProp(x, y, groundProps) : null;
@@ -152,7 +153,14 @@ export function buildMap(text, {
       const variant = useDecor ? pick(decorated, hash(y, x, seed + 7)) : pick(plain, hash(x + 31, y + 17, seed));
       tileOp(variant, wd.rows.ground, x, y);
       if (groundProp) tileOp(groundProp.col, wd.rows.props, x, y);
+    }
+  }
 
+  // Pass 2: walls row by row; each wall slot is 2×2 tiles anchored on its cell,
+  // so later walls (right / below) cover what earlier ones spill onto them.
+  for (let y = 0; y < cells; y++) {
+    for (let x = 0; x < cells; x++) {
+      const r = y - quiet, c = x - quiet;
       const k = kind(r, c);
       if (!k) continue;
       let mask = 0;
@@ -160,7 +168,8 @@ export function buildMap(text, {
       if (kind(r, c + 1) === k) mask |= E;
       if (kind(r + 1, c) === k) mask |= S;
       if (kind(r, c - 1) === k) mask |= W;
-      tileOp(mask, wd.rows[k], x, y);
+      const slot = wallSlot(mask);
+      ops.push({ sx: slot.col * T, sy: (wd.rows[k] + slot.row) * T, dx: x * T, dy: y * T, w: 2 * T, h: 2 * T });
 
       if (k === "wall" && !covered(r, c)) {
         const wallProp = pickProp(x, y, bySlot("wall", ...(mask & S ? [] : ["wall-front"])));

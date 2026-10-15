@@ -1,32 +1,41 @@
 // QRquest spritesheet format.
 //
 // The sheet is 16 tiles wide; the tile size is width / 16 (16 px, 32 px…).
-// Each world is a band of 7 tile rows; the number of worlds is height / (7 × tile).
+// Each world is a band of 13 tile rows; the number of worlds is height / (13 × tile).
 // Inside a band, every slot is optional unless noted: an empty (fully transparent)
 // slot is simply not used, so worlds can have different numbers of inhabitants
 // and landmarks.
 //
-//   row 0 : walls (required) — 16 autotiles, column = neighbour mask (N=1 E=2 S=4 W=8)
-//   row 1 : special walls for finder/alignment patterns, same masks
-//           (empty row → the regular walls are used)
-//   row 2 : ground — columns 0-7 plain variants (at least one required),
-//           columns 8-15 decorated variants
-//   row 3 : inhabitants — columns 0-7 on ground clearings, 8-11 on any wall,
-//           12-15 on wall fronts (wall with nothing below)
-//   rows 4-6 : landmarks — 3×3 slots at columns 0, 3, 6 and
-//              2×2 slots at columns 9, 11, 13 (rows 4-5)
+//   rows 0-3 : walls (required) — 16 autotiles in 2×2-tile slots, 8 per row pair,
+//              slot index = neighbour mask (N=1 E=2 S=4 W=8). The module itself is
+//              the slot's top-left tile; the rest may hold what spills down/right
+//              onto neighbouring cells (2.5D cast shadow, semi-transparent).
+//   rows 4-7 : special walls for finder/alignment patterns, same layout
+//              (empty → the regular walls are used)
+//   row 8  : ground — columns 0-7 plain variants (at least one required),
+//            columns 8-15 decorated variants
+//   row 9  : inhabitants — columns 0-7 on ground clearings, 8-11 on any wall,
+//            12-15 on wall fronts (wall with nothing below)
+//   rows 10-12 : landmarks — 3×3 slots at columns 0, 3, 6 and
+//                2×2 slots at columns 9, 11, 13 (rows 10-11)
+//
+// Rendering draws all ground first, then walls row by row: a wall's spill-over
+// is covered by any wall to its right or below, and shadows that are the wall
+// shape shifted down-right never overlap each other.
 //
 // World names are read from an optional tiles.json: { "worlds": ["Forêt", …] }.
 
 export const COLUMNS = 16;
-export const ROWS_PER_WORLD = 7;
+export const ROWS_PER_WORLD = 13;
 
 export const N = 1;
 export const E = 2;
 export const S = 4;
 export const W = 8;
 
-export const ROW = { wall: 0, special: 1, ground: 2, props: 3, landmarks: 4 };
+export const ROW = { wall: 0, special: 4, ground: 8, props: 9, landmarks: 10 };
+/** Position (in tiles, relative to the wall band) of the 2×2 slot for a neighbour mask. */
+export const wallSlot = (mask) => ({ col: (mask % 8) * 2, row: Math.floor(mask / 8) * 2 });
 export const GROUND_SLOTS = { plain: [0, 8], decor: [8, 16] };
 export const PROP_SLOTS = { ground: [0, 8], wall: [8, 12], "wall-front": [12, 16] };
 export const LANDMARK_SLOTS = [
@@ -55,7 +64,7 @@ export function analyzeTileset(image, manifest = {}) {
   }
   const worldCount = Math.floor(height / (tile * ROWS_PER_WORLD));
   if (worldCount < 1) {
-    throw new Error(`Le tileset doit faire au moins ${tile * ROWS_PER_WORLD}px de haut (7 rangées de tuiles par monde).`);
+    throw new Error(`Le tileset doit faire au moins ${tile * ROWS_PER_WORLD}px de haut (${ROWS_PER_WORLD} rangées de tuiles par monde).`);
   }
 
   // Is any pixel of the area (in tile units) not fully transparent?
@@ -72,10 +81,10 @@ export function analyzeTileset(image, manifest = {}) {
     for (let c = from; c < to; c++) if (filled(c, row)) cols.push(c);
     return cols;
   };
-  // Average luma of (mostly) opaque pixels over several tiles of a row
-  const luma = (cols, row) => {
+  // Average luma of (mostly) opaque pixels over several tiles ([col,row] pairs)
+  const luma = (cells) => {
     let total = 0, weight = 0;
-    for (const col of cols) for (let y = row * tile; y < (row + 1) * tile; y++) for (let x = col * tile; x < (col + 1) * tile; x++) {
+    for (const [col, row] of cells) for (let y = row * tile; y < (row + 1) * tile; y++) for (let x = col * tile; x < (col + 1) * tile; x++) {
       const i = (y * width + x) * 4, a = data[i + 3] / 255;
       if (a < 0.5) continue;
       total += (0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]) * a; weight += a;
@@ -96,13 +105,16 @@ export function analyzeTileset(image, manifest = {}) {
   const worlds = [];
   for (let w = 0; w < worldCount; w++) {
     const base = w * ROWS_PER_WORLD;
-    const missing = [];
-    for (let m = 0; m < 16; m++) if (!filled(m, base + ROW.wall)) missing.push(m);
+    const masks = Array.from({ length: 16 }, (_, m) => m);
+    const slotFilled = (band, m) => { const sl = wallSlot(m); return filled(sl.col, band + sl.row, 2, 2); };
+    // the module cell of each wall slot (top-left tile)
+    const cells = (band) => masks.map((m) => { const sl = wallSlot(m); return [sl.col, band + sl.row]; });
+    const missing = masks.filter((m) => !slotFilled(base + ROW.wall, m));
     const plain = range(GROUND_SLOTS.plain, base + ROW.ground);
     if (missing.length || !plain.length) {
       throw new Error(`Monde ${w + 1} : ${missing.length ? `tuiles de mur manquantes (${missing.join(", ")})` : "aucune tuile de sol simple"}.`);
     }
-    const specialComplete = Array.from({ length: 16 }, (_, m) => filled(m, base + ROW.special)).every(Boolean);
+    const specialComplete = masks.every((m) => slotFilled(base + ROW.special, m));
 
     const props = Object.entries(PROP_SLOTS).flatMap(([slot, cols]) =>
       range(cols, base + ROW.props).map((col) => ({ slot, col })));
@@ -111,9 +123,8 @@ export function analyzeTileset(image, manifest = {}) {
       .map(({ col, size }) => ({ col, size }));
 
     // Contrast between dark modules (walls, special walls) and light ones (plain ground)
-    const masks = Array.from({ length: 16 }, (_, m) => m);
-    const light = luma(plain, base + ROW.ground);
-    const dark = Math.max(luma(masks, base + ROW.wall), specialComplete ? luma(masks, base + ROW.special) : 0);
+    const light = luma(plain.map((c) => [c, base + ROW.ground]));
+    const dark = Math.max(luma(cells(base + ROW.wall)), specialComplete ? luma(cells(base + ROW.special)) : 0);
     const delta = light - dark;
     const contrast = {
       dark: Math.round(dark), light: Math.round(light), delta: Math.round(delta),
@@ -122,7 +133,8 @@ export function analyzeTileset(image, manifest = {}) {
     };
 
     // UI accent: the wall colour, lightened
-    const accent = average(15, base + ROW.wall).map((v) => Math.round(v + (255 - v) * 0.55));
+    const full = wallSlot(15);
+    const accent = average(full.col, base + ROW.wall + full.row).map((v) => Math.round(v + (255 - v) * 0.55));
 
     worlds.push({
       index: w,

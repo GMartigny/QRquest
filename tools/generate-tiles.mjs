@@ -3,7 +3,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { PNG } from "pngjs";
 import {
-  COLUMNS, ROWS_PER_WORLD, ROW, N, E, S, W, GROUND_SLOTS, PROP_SLOTS, LANDMARK_SLOTS, analyzeTileset,
+  COLUMNS, ROWS_PER_WORLD, ROW, N, E, S, W, GROUND_SLOTS, PROP_SLOTS, LANDMARK_SLOTS, analyzeTileset, wallSlot,
 } from "../src/tileset.js";
 
 // Content of the default sheet. The app does not read this: it discovers worlds,
@@ -88,20 +88,47 @@ function shapeFor(mask) {
   };
 }
 
-function autotileRow(row, seed, { texture, outline, top, bottom }) {
+// 2.5D walls. Each mask gets a 2×2-tile slot: the module is the top-left tile,
+// the cast shadow (wall shape shifted down-right) spills onto the neighbours.
+const FACE = 6;   // height of the vertical front face, shown when nothing is below
+const SHADOW = 4; // shadow offset, down and right
+function autotileRow(band, seed, { texture, face, lip, outline, top, shadow }) {
   for (let mask = 0; mask < 16; mask++) {
     const rng = mulberry32(seed * 100 + mask);
     const tex = texture(rng, mask);
+    const faceTex = face(mulberry32(seed * 100 + mask + 50));
     const sh = shapeFor(mask);
-    drawTile(mask, row, (x, y) => {
-      if (!sh.inside(x, y)) return null;
-      if (sh.outline(x, y)) return outline;
-      if (top && sh.top(x, y)) return typeof top === "function" ? top(x, y) : top;
-      if (bottom && sh.bottom(x, y)) return bottom;
-      return tex(x, y);
-    });
+    const inCell = (x, y) => x >= 0 && y >= 0 && x < TILE && y < TILE && sh.inside(x, y);
+    const front = !(mask & S);
+    const slot = wallSlot(mask);
+    const plot = (x, y, c) => put(slot.col + Math.floor(x / TILE), band + slot.row + Math.floor(y / TILE), x % TILE, y % TILE, c);
+    for (let y = 0; y < TILE + SHADOW; y++) {
+      for (let x = 0; x < TILE + SHADOW; x++) {
+        if (!inCell(x, y)) {
+          if (inCell(x - SHADOW, y - SHADOW)) plot(x, y, shadow);
+          continue;
+        }
+        let c;
+        if (sh.outline(x, y)) c = outline;
+        else if (front && y >= TILE - FACE) c = y === TILE - FACE ? lip : faceTex(x, y);
+        else if (top && sh.top(x, y)) c = typeof top === "function" ? top(x, y) : top;
+        else c = tex(x, y);
+        plot(x, y, c);
+      }
+    }
   }
 }
+
+// Front-face textures (vertical side of a wall)
+const trunks = (pal) => (rng) => (x) => (x % 4 === 1 || x % 4 === 2 ? (rng() < 0.15 ? pal.knot : pal.bark) : pal.gap);
+const faceBricks = (pal) => () => (x, y) => {
+  const row = y - (TILE - FACE) - 1; // 0..FACE-2 below the lip
+  const off = row >= 3 ? 4 : 0;
+  if (row === 2 || (x + off) % 8 === 7) return pal.mortar;
+  return pal.base;
+};
+const faceBlocks = (pal) => (rng) => (x) => (x % 6 === 5 ? pal.mortar : rng() < 0.1 ? pal.alt : pal.base);
+const slate = (pal) => (rng) => (x, y) => (rng() < 0.12 ? pal.alt : (x + y * 3) % 13 === 0 ? pal.light : pal.base);
 
 // ---------- textures ----------
 // Leafy canopy: base noise + a few rounded leaf clusters with a dark underside.
@@ -201,11 +228,13 @@ const themes = {
     const t = 0;
     autotileRow(themeRow(t, "wall"), 11, {
       texture: canopy({ base: "#22502b", light: "#2b5e34", dark: "#1b4523" }),
-      outline: "#0c2211", top: "#3d7d45", bottom: "#123018",
+      face: trunks({ bark: "#4a3422", knot: "#3a281a", gap: "#16100a" }), lip: "#123018",
+      outline: "#0c2211", top: "#3d7d45", shadow: "#0b2a1266",
     });
     autotileRow(themeRow(t, "special"), 12, {
       texture: stones({ base: "#33373e", alt: "#2d3036", light: "#40454d", mortar: "#222429" }),
-      outline: "#131518", top: "#4f5560", bottom: "#1b1d21",
+      face: faceBlocks({ base: "#26292f", alt: "#212329", mortar: "#16181c" }), lip: "#1b1d21",
+      outline: "#131518", top: "#4f5560", shadow: "#0b2a1266",
     });
     groundRow(themeRow(t, "ground"), 13,
       { base: "#cbe59a", high: "#d4eaa8", speck: "#c0de8c" },
@@ -229,12 +258,14 @@ const themes = {
   dungeon() {
     const t = 1;
     autotileRow(themeRow(t, "wall"), 21, {
-      texture: bricks({ base: "#3d3550", alt: "#372f49", light: "#4b4263", mortar: "#272134" }),
-      outline: "#140f1d", top: "#625785", bottom: "#211b2d",
+      texture: slate({ base: "#2e2840", alt: "#29233a", light: "#3c3454" }),
+      face: faceBricks({ base: "#3d3550", mortar: "#221c30" }), lip: "#4b4263",
+      outline: "#140f1d", top: "#4f466b", shadow: "#3a280c55",
     });
     autotileRow(themeRow(t, "special"), 22, {
       texture: stones({ base: "#2a3a44", alt: "#25333c", light: "#36505c", mortar: "#18232a" }),
-      outline: "#0b1216", top: "#4a6b78", bottom: "#141e24",
+      face: faceBlocks({ base: "#1f2c34", alt: "#1b272e", mortar: "#111a20" }), lip: "#36505c",
+      outline: "#0b1216", top: "#4a6b78", shadow: "#3a280c55",
     });
     groundRow(themeRow(t, "ground"), 23,
       {
@@ -260,11 +291,13 @@ const themes = {
     const t = 2;
     autotileRow(themeRow(t, "wall"), 31, {
       texture: pines({ base: "#1f4540", light: "#2b5b54", dark: "#163430" }),
-      outline: "#0b1d1b", top: (x) => (x % 3 === 0 ? "#7f9fa6" : "#3d6d66"), bottom: "#122a27",
+      face: trunks({ bark: "#3e2c20", knot: "#30221a", gap: "#0f1a19" }), lip: "#122a27",
+      outline: "#0b1d1b", top: (x) => (x % 3 === 0 ? "#7f9fa6" : "#3d6d66"), shadow: "#1a3a6044",
     });
     autotileRow(themeRow(t, "special"), 32, {
       texture: ice({ base: "#26375a", alt: "#223150", light: "#3a5282", mortar: "#18233c" }),
-      outline: "#0c1220", top: "#55709f", bottom: "#141d33",
+      face: faceBlocks({ base: "#1c2a46", alt: "#18243e", mortar: "#101a2e" }), lip: "#3a5282",
+      outline: "#0c1220", top: "#55709f", shadow: "#1a3a6044",
     });
     groundRow(themeRow(t, "ground"), 33,
       { base: "#eef4fa", high: "#ffffff", speck: "#dbe6f1" },
@@ -314,8 +347,9 @@ THEMES.forEach((theme, t) => {
       if (!sprite) throw new Error(`Missing sprite ${id}`);
       drawSprite(col, themeRow(t, "props"), sprite);
       const ground = slot === "ground";
-      const baseRow = themeRow(t, ground ? "ground" : "wall");
-      const baseCol = ground ? 0 : 15;
+      const fullSlot = wallSlot(15);
+      const baseRow = ground ? themeRow(t, "ground") : themeRow(t, "wall") + fullSlot.row;
+      const baseCol = ground ? 0 : fullSlot.col;
       const full = composite(col, themeRow(t, "props"), baseCol, baseRow, 0);
       const center = composite(col, themeRow(t, "props"), baseCol, baseRow, 4);
       const ok = ground ? full > 165 && center > 150 : full < 90 && center < 85;

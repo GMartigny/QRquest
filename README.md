@@ -25,24 +25,26 @@ npm run tiles    # régénère public/tiles.png
 Le tileset se remplace sans toucher au code. Dans l'interface, **📂 Charger** utilise ton PNG (sélectionne aussi son `.json` pour nommer les mondes) le temps de la session, et **⬇ Modèle** télécharge le tileset par défaut comme point de départ. Pour changer le tileset du site, déposer un autre `public/tiles.png` (et éventuellement `public/tiles.json`). L'application lit l'image et en déduit tout le reste :
 
 - **taille des tuiles** = largeur ÷ 16 (16 px, 32 px…) ;
-- **nombre de mondes** = hauteur ÷ (7 × taille de tuile) — une bande de 7 rangées par monde ;
+- **nombre de mondes** = hauteur ÷ (13 × taille de tuile) — une bande de 13 rangées par monde ;
 - **sols, habitants et bâtiments** : chaque case est un emplacement, utilisé seulement s'il n'est pas entièrement transparent. Chaque monde peut donc en avoir un nombre différent.
 
 Organisation d'une bande (colonnes 0 à 15) :
 
-| Rangée | Contenu |
+| Rangées | Contenu |
 | --- | --- |
-| 0 | **murs (obligatoire)** : 16 tuiles, colonne = masque des voisins (N=1, E=2, S=4, O=8) |
-| 1 | murs « spéciaux » des carrés de repérage, mêmes masques (rangée vide → murs normaux) |
-| 2 | sol : colonnes 0-7 variantes simples (au moins une), 8-15 variantes décorées |
-| 3 | habitants : colonnes 0-7 sur le sol, 8-11 sur un mur, 12-15 sur une façade de mur (rien en dessous) |
-| 4-6 | bâtiments : emplacements 3×3 aux colonnes 0, 3 et 6 ; emplacements 2×2 aux colonnes 9, 11 et 13 (rangées 4-5) |
+| 0-3 | **murs (obligatoire)** : 16 emplacements de 2×2 tuiles, 8 par paire de rangées, index = masque des voisins (N=1, E=2, S=4, O=8). Le module est la tuile en haut à gauche de l'emplacement ; le reste reçoit ce qui déborde en bas et à droite (ombre portée semi-transparente) |
+| 4-7 | murs « spéciaux » des carrés de repérage, même organisation (vide → murs normaux) |
+| 8 | sol : colonnes 0-7 variantes simples (au moins une), 8-15 variantes décorées |
+| 9 | habitants : colonnes 0-7 sur le sol, 8-11 sur un mur, 12-15 sur une façade de mur (rien en dessous) |
+| 10-12 | bâtiments : emplacements 3×3 aux colonnes 0, 3 et 6 ; emplacements 2×2 aux colonnes 9, 11 et 13 (rangées 10-11) |
 
 Noms des mondes (optionnel, sinon « Monde 1 », « Monde 2 »…) dans `public/tiles.json` :
 
 ```json
 { "worlds": ["Forêt", "Donjon", "Toundra"] }
 ```
+
+**Rendu 2.5D** : tout le sol est dessiné d'abord, puis les murs ligne par ligne. Un mur déborde donc sur le sol voisin (ombre), et ce débordement est recouvert par tout mur situé à droite ou en dessous. Si l'ombre est la forme du mur décalée en bas à droite, deux ombres ne se superposent jamais. Dans le tileset par défaut, un mur sans voisin en dessous montre aussi une façade verticale (troncs, briques, blocs).
 
 La transparence partielle (canal alpha) est prise en compte, par exemple pour un slime ou de la glace.
 
