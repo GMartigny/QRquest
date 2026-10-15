@@ -9,6 +9,7 @@ const ctx = canvas.getContext("2d");
 const textEl = $("#text");
 const errorEl = $("#error");
 const worldsEl = $("#themes");
+const PREVIEW_SCALE = 2;
 
 const store = {
   get(key, fallback) { try { return localStorage.getItem(`qrquest.${key}`) ?? fallback; } catch { return fallback; } },
@@ -73,8 +74,10 @@ function render() {
   }
   showError("");
   const { map } = state;
-  canvas.width = canvas.height = map.size;
-  drawMap(ctx, map, sheet, 1);
+  // crisp ×2 preview (CSS shrinks it only when the viewport is too narrow)
+  canvas.width = canvas.height = map.size * PREVIEW_SCALE;
+  canvas.style.width = `${map.size * PREVIEW_SCALE}px`;
+  drawMap(ctx, map, sheet, PREVIEW_SCALE);
   canvas.setAttribute("aria-label", `QR code : ${text}`);
   $("#hud-level").textContent = `NIV. ${map.version}`;
   $("#hud-size").textContent = `${map.n}×${map.n}`;
