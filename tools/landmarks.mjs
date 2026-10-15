@@ -53,6 +53,19 @@ export class Painter {
     draw(layer);
     layer.px.forEach((line, y) => line.forEach((c, x) => { if (c && !this.px[y][x]) this.px[y][x] = c; }));
   }
+  // Move the whole drawing (pixels pushed out of the canvas are lost)
+  shift(dx, dy) {
+    const old = this.px;
+    this.px = Array.from({ length: this.h }, (_, y) => Array.from({ length: this.w }, (_, x) => old[y - dy]?.[x - dx] ?? null));
+  }
+  // Cast shadow: the solid part of the drawing, offset down-right, on empty pixels only
+  castShadow(offset, color) {
+    const solid = (c) => c && (c.length < 9 || parseInt(c.slice(7, 9), 16) >= 0x80);
+    const src = this.px.map((line) => line.map(solid));
+    this.behind((g) => {
+      for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) if (src[y - offset]?.[x - offset]) g.set(x, y, color);
+    });
+  }
   // 1px outline around every opaque pixel
   outline(c) {
     const add = [];

@@ -11,21 +11,23 @@ import {
 const TILE = 16;
 const THEMES = [
   {
-    id: "forest", label: "Forêt",
+    id: "forest", label: "Forêt", shadow: "#0b2a1266",
     props: { ground: ["sign", "mushroom", "rabbit"], wall: ["apples", "owl", "cardinal"], "wall-front": [] },
     landmarks: { 3: ["tavern", "oak"], 2: ["well", "campfire"] },
   },
   {
-    id: "dungeon", label: "Donjon",
+    id: "dungeon", label: "Donjon", shadow: "#3a280c55",
     props: { ground: ["skull", "potion", "key"], wall: ["cobweb"], "wall-front": ["torch", "banner"] },
     landmarks: { 3: ["crypt", "altar"], 2: ["chest", "slime"] },
   },
   {
-    id: "snow", label: "Toundra",
+    id: "snow", label: "Toundra", shadow: "#1a3a6044",
     props: { ground: ["fox", "snowman", "sled"], wall: ["squirrel", "robin"], "wall-front": ["lantern"] },
     landmarks: { 3: ["igloo", "crevasse"], 2: ["icehole", "rock"] },
   },
 ];
+// Landmarks lying flat on the ground: no cast shadow
+const FLAT_LANDMARKS = new Set(["crevasse", "icehole"]);
 const themeRow = (t, kind) => t * ROWS_PER_WORLD + ROW[kind];
 import { PROPS } from "./props.mjs";
 import { LANDMARKS, Painter } from "./landmarks.mjs";
@@ -92,20 +94,20 @@ function shapeFor(mask) {
 // the cast shadow (wall shape shifted down-right) spills onto the neighbours.
 const FACE = 6;   // height of the vertical front face, shown when nothing is below
 const SHADOW = 4; // shadow offset, down and right
-function autotileRow(band, seed, { texture, face, lip, outline, top, shadow }) {
+function autotileRow(band, seed, { texture, face, lip, outline, top, shadow, flat = false }) {
   for (let mask = 0; mask < 16; mask++) {
     const rng = mulberry32(seed * 100 + mask);
     const tex = texture(rng, mask);
-    const faceTex = face(mulberry32(seed * 100 + mask + 50));
+    const faceTex = face ? face(mulberry32(seed * 100 + mask + 50)) : null;
     const sh = shapeFor(mask);
     const inCell = (x, y) => x >= 0 && y >= 0 && x < TILE && y < TILE && sh.inside(x, y);
-    const front = !(mask & S);
+    const front = !flat && !(mask & S); // flat tiles (finder patterns) have no thickness
     const slot = wallSlot(mask);
     const plot = (x, y, c) => put(slot.col + Math.floor(x / TILE), band + slot.row + Math.floor(y / TILE), x % TILE, y % TILE, c);
     for (let y = 0; y < TILE + SHADOW; y++) {
       for (let x = 0; x < TILE + SHADOW; x++) {
         if (!inCell(x, y)) {
-          if (inCell(x - SHADOW, y - SHADOW)) plot(x, y, shadow);
+          if (!flat && inCell(x - SHADOW, y - SHADOW)) plot(x, y, shadow);
           continue;
         }
         let c;
@@ -233,8 +235,7 @@ const themes = {
     });
     autotileRow(themeRow(t, "special"), 12, {
       texture: stones({ base: "#33373e", alt: "#2d3036", light: "#40454d", mortar: "#222429" }),
-      face: faceBlocks({ base: "#26292f", alt: "#212329", mortar: "#16181c" }), lip: "#1b1d21",
-      outline: "#131518", top: "#4f5560", shadow: "#0b2a1266",
+      outline: "#131518", top: "#4f5560", flat: true,
     });
     groundRow(themeRow(t, "ground"), 13,
       { base: "#cbe59a", high: "#d4eaa8", speck: "#c0de8c" },
@@ -264,8 +265,7 @@ const themes = {
     });
     autotileRow(themeRow(t, "special"), 22, {
       texture: stones({ base: "#2a3a44", alt: "#25333c", light: "#36505c", mortar: "#18232a" }),
-      face: faceBlocks({ base: "#1f2c34", alt: "#1b272e", mortar: "#111a20" }), lip: "#36505c",
-      outline: "#0b1216", top: "#4a6b78", shadow: "#3a280c55",
+      outline: "#0b1216", top: "#4a6b78", flat: true,
     });
     groundRow(themeRow(t, "ground"), 23,
       {
@@ -296,8 +296,7 @@ const themes = {
     });
     autotileRow(themeRow(t, "special"), 32, {
       texture: ice({ base: "#26375a", alt: "#223150", light: "#3a5282", mortar: "#18233c" }),
-      face: faceBlocks({ base: "#1c2a46", alt: "#18243e", mortar: "#101a2e" }), lip: "#3a5282",
-      outline: "#0c1220", top: "#55709f", shadow: "#1a3a6044",
+      outline: "#0c1220", top: "#55709f", flat: true,
     });
     groundRow(themeRow(t, "ground"), 33,
       { base: "#eef4fa", high: "#ffffff", speck: "#dbe6f1" },
@@ -367,6 +366,8 @@ THEMES.forEach((theme, t) => {
       if (!draw || !slots[i]) throw new Error(`Landmark ${id}: sprite or ${size}×${size} slot missing`);
       const p = new Painter(size * TILE, size * TILE);
       draw(p);
+      // 2.5D: standing landmarks cast the same down-right shadow as walls
+      if (!FLAT_LANDMARKS.has(id)) { p.shift(-2, -2); p.castShadow(3, theme.shadow); }
       p.px.forEach((line, y) => line.forEach((c, x) => {
         if (c) put(slots[i].col + Math.floor(x / TILE), themeRow(t, "landmarks") + Math.floor(y / TILE), x % TILE, y % TILE, c);
       }));

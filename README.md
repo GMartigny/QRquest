@@ -44,7 +44,7 @@ Noms des mondes (optionnel, sinon « Monde 1 », « Monde 2 »…) dans `public/
 { "worlds": ["Forêt", "Donjon", "Toundra"] }
 ```
 
-**Rendu 2.5D** : tout le sol est dessiné d'abord, puis les murs ligne par ligne. Un mur déborde donc sur le sol voisin (ombre), et ce débordement est recouvert par tout mur situé à droite ou en dessous. Si l'ombre est la forme du mur décalée en bas à droite, deux ombres ne se superposent jamais. Dans le tileset par défaut, un mur sans voisin en dessous montre aussi une façade verticale (troncs, briques, blocs).
+**Rendu 2.5D** : tout le sol est dessiné d'abord, puis les murs ligne par ligne. Un mur déborde donc sur le sol voisin (ombre), et ce débordement est recouvert par tout mur situé à droite ou en dessous. Si l'ombre est la forme du mur décalée en bas à droite, deux ombres ne se superposent jamais. Dans le tileset par défaut, un mur sans voisin en dessous montre aussi une façade verticale (troncs, briques). Les carrés de repérage sont des dalles plates (ni façade ni ombre), et les bâtiments debout portent la même ombre que les murs, dessinée dans leur emplacement (la crevasse et le trou de pêche, à plat, n'en ont pas).
 
 La transparence partielle (canal alpha) est prise en compte, par exemple pour un slime ou de la glace.
 
