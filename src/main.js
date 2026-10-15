@@ -8,7 +8,7 @@ const ctx = canvas.getContext("2d");
 const textEl = $("#text");
 const errorEl = $("#error");
 const worldsEl = $("#themes");
-const PREVIEW_SCALE = 2;
+const PREVIEW_SCALE = 1; // strict ×1 preview (CSS only shrinks it when space runs out)
 const API = "/api/qr";
 const MAX_UPLOAD = 4 * 1024 * 1024; // the API refuses bigger tilesets
 
@@ -107,7 +107,6 @@ async function render() {
     const bitmap = await createImageBitmap(await res.blob());
     if (controller.signal.aborted) return;
     showError("");
-    // drawn at ×2; CSS shows it at ×1 on mobile, ×2 on desktop (see --qr-size)
     canvas.width = bitmap.width;
     canvas.height = bitmap.height;
     canvas.style.setProperty("--qr-size", `${bitmap.width / PREVIEW_SCALE}px`);
