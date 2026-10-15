@@ -101,7 +101,7 @@ function autotileRow(band, seed, { texture, face, lip, outline, top, shadow, fla
     const faceTex = face ? face(mulberry32(seed * 100 + mask + 50)) : null;
     const sh = shapeFor(mask);
     const inCell = (x, y) => x >= 0 && y >= 0 && x < TILE && y < TILE && sh.inside(x, y);
-    const front = !flat && !(mask & S); // flat tiles (finder patterns) have no thickness
+    const front = !flat && !(mask & S); // flat tiles have no thickness
     const slot = wallSlot(mask);
     const plot = (x, y, c) => put(slot.col + Math.floor(x / TILE), band + slot.row + Math.floor(y / TILE), x % TILE, y % TILE, c);
     for (let y = 0; y < TILE + SHADOW; y++) {
@@ -230,12 +230,12 @@ const themes = {
     const t = 0;
     autotileRow(themeRow(t, "wall"), 11, {
       texture: canopy({ base: "#22502b", light: "#2b5e34", dark: "#1b4523" }),
-      face: trunks({ bark: "#4a3422", knot: "#3a281a", gap: "#16100a" }), lip: "#123018",
-      outline: "#0c2211", top: "#3d7d45", shadow: "#0b2a1266",
+      outline: "#0c2211", top: "#3d7d45", flat: true,
     });
     autotileRow(themeRow(t, "special"), 12, {
       texture: stones({ base: "#33373e", alt: "#2d3036", light: "#40454d", mortar: "#222429" }),
-      outline: "#131518", top: "#4f5560", flat: true,
+      face: faceBlocks({ base: "#26292f", alt: "#212329", mortar: "#16181c" }), lip: "#1b1d21",
+      outline: "#131518", top: "#4f5560", shadow: "#0b2a1266",
     });
     groundRow(themeRow(t, "ground"), 13,
       { base: "#cbe59a", high: "#d4eaa8", speck: "#c0de8c" },
@@ -259,13 +259,13 @@ const themes = {
   dungeon() {
     const t = 1;
     autotileRow(themeRow(t, "wall"), 21, {
-      texture: slate({ base: "#2e2840", alt: "#29233a", light: "#3c3454" }),
-      face: faceBricks({ base: "#3d3550", mortar: "#221c30" }), lip: "#4b4263",
-      outline: "#140f1d", top: "#4f466b", shadow: "#3a280c55",
+      texture: bricks({ base: "#3d3550", alt: "#372f49", light: "#4b4263", mortar: "#272134" }),
+      outline: "#140f1d", top: "#625785", flat: true,
     });
     autotileRow(themeRow(t, "special"), 22, {
       texture: stones({ base: "#2a3a44", alt: "#25333c", light: "#36505c", mortar: "#18232a" }),
-      outline: "#0b1216", top: "#4a6b78", flat: true,
+      face: faceBlocks({ base: "#1f2c34", alt: "#1b272e", mortar: "#111a20" }), lip: "#36505c",
+      outline: "#0b1216", top: "#4a6b78", shadow: "#3a280c55",
     });
     groundRow(themeRow(t, "ground"), 23,
       {
@@ -291,12 +291,12 @@ const themes = {
     const t = 2;
     autotileRow(themeRow(t, "wall"), 31, {
       texture: pines({ base: "#1f4540", light: "#2b5b54", dark: "#163430" }),
-      face: trunks({ bark: "#3e2c20", knot: "#30221a", gap: "#0f1a19" }), lip: "#122a27",
-      outline: "#0b1d1b", top: (x) => (x % 3 === 0 ? "#7f9fa6" : "#3d6d66"), shadow: "#1a3a6044",
+      outline: "#0b1d1b", top: (x) => (x % 3 === 0 ? "#7f9fa6" : "#3d6d66"), flat: true,
     });
     autotileRow(themeRow(t, "special"), 32, {
       texture: ice({ base: "#26375a", alt: "#223150", light: "#3a5282", mortar: "#18233c" }),
-      outline: "#0c1220", top: "#55709f", flat: true,
+      face: faceBlocks({ base: "#1c2a46", alt: "#18243e", mortar: "#101a2e" }), lip: "#3a5282",
+      outline: "#0c1220", top: "#55709f", shadow: "#1a3a6044",
     });
     groundRow(themeRow(t, "ground"), 33,
       { base: "#eef4fa", high: "#ffffff", speck: "#dbe6f1" },
