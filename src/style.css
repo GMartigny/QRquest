@@ -1,0 +1,148 @@
+:root {
+  --bg: #12101a;
+  --bg-2: #1b1828;
+  --panel: #1d2b53;
+  --panel-2: #16214a;
+  --ink: #fff1e8;
+  --muted: #a7a3c2;
+  --accent: #ffcc4d;
+  --accent-ink: #2b1d00;
+  --danger: #ff6b7a;
+  --border: #fff1e8;
+  --theme: #7fd36b;
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  color: var(--ink);
+  background: var(--bg);
+}
+body[data-theme="dungeon"] { --theme: #b49cff; }
+body[data-theme="snow"] { --theme: #8fd6ff; }
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    repeating-linear-gradient(0deg, rgb(0 0 0 / 0.18) 0 2px, transparent 2px 4px),
+    radial-gradient(ellipse at top, var(--bg-2), var(--bg) 70%);
+  display: flex;
+  justify-content: center;
+  padding: 24px 16px 40px;
+}
+
+.console {
+  width: min(100%, 560px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ---------- title ---------- */
+.title { text-align: center; }
+h1 {
+  margin: 0;
+  font-size: clamp(28px, 8vw, 44px);
+  letter-spacing: 2px;
+  color: var(--accent);
+  text-shadow: 4px 4px 0 #b4561f, 8px 8px 0 rgb(0 0 0 / 0.5);
+}
+h1 span { color: var(--theme); text-shadow: 4px 4px 0 rgb(0 0 0 / 0.55), 8px 8px 0 rgb(0 0 0 / 0.3); }
+.press {
+  margin: 14px 0 0;
+  font-size: 9px;
+  color: var(--muted);
+  animation: blink 1.2s steps(2, start) infinite;
+}
+
+/* ---------- screen ---------- */
+.screen {
+  background: #000;
+  padding: 10px;
+  border: 4px solid var(--border);
+  box-shadow: 0 0 0 4px #000, 0 0 0 8px var(--theme), 12px 12px 0 8px rgb(0 0 0 / 0.5);
+}
+.hud {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  padding: 2px 4px 10px;
+}
+.hearts { color: var(--danger); letter-spacing: 2px; }
+#qr {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  background: #fff;
+}
+
+/* ---------- dialog box ---------- */
+.dialog {
+  position: relative;
+  background: linear-gradient(var(--panel), var(--panel-2));
+  border: 4px solid var(--border);
+  box-shadow: inset 0 0 0 4px var(--panel), inset 0 0 0 6px #7a86b8, 8px 8px 0 rgb(0 0 0 / 0.5);
+  padding: 22px 20px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.label { font-size: 10px; color: var(--accent); margin-bottom: 10px; display: block; padding: 0; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+
+textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--ink);
+  background: rgb(0 0 0 / 0.35);
+  border: 2px solid #7a86b8;
+  padding: 10px;
+  outline: none;
+}
+textarea:focus { border-color: var(--accent); }
+
+.error { margin: -6px 0 0; font-size: 9px; line-height: 1.6; color: var(--danger); }
+
+.choices { display: flex; flex-wrap: wrap; gap: 8px; }
+
+button, select {
+  font: inherit;
+  font-size: 10px;
+  color: var(--ink);
+  background: #2a3a6e;
+  border: 2px solid var(--border);
+  box-shadow: 3px 3px 0 #000;
+  padding: 9px 12px;
+  cursor: pointer;
+}
+button:hover, select:hover { background: #34488a; }
+button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+button:focus-visible, select:focus-visible { outline: 2px dashed var(--accent); outline-offset: 3px; }
+button[aria-pressed="true"] { background: var(--theme); color: #0e1020; }
+button[aria-pressed="true"]::before { content: "▶ "; }
+button.primary { background: var(--accent); color: var(--accent-ink); }
+button.primary:hover { background: #ffd977; }
+
+.actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+.download { display: flex; gap: 8px; }
+
+.caret {
+  position: absolute;
+  right: 14px;
+  bottom: 8px;
+  font-size: 10px;
+  color: var(--accent);
+  animation: bob 0.8s steps(2) infinite;
+}
+
+footer { text-align: center; font-size: 8px; color: var(--muted); line-height: 1.8; }
+footer a { color: var(--theme); }
+
+@keyframes blink { to { visibility: hidden; } }
+@keyframes bob { 50% { transform: translateY(3px); } }
+@media (prefers-reduced-motion: reduce) {
+  .press, .caret { animation: none; }
+}
