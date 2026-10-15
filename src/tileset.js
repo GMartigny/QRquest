@@ -34,6 +34,11 @@ export const LANDMARK_SLOTS = [
   { col: 9, size: 2 }, { col: 11, size: 2 }, { col: 13, size: 2 },
 ];
 
+// Luminance gap (0-255, Rec. 709 luma as used by QR decoders) between the average
+// dark tile and the average light tile. Calibrated with tools/scan-test-style
+// renders: ≥ 140 reads reliably, 100-140 gets flaky, < 100 mostly fails.
+export const CONTRAST = { good: 140, weak: 100 };
+
 /** Column of a slot for a given kind, used by the generator to lay out the default sheet. */
 export const slotColumn = (range, index) => range[0] + index;
 
@@ -67,6 +72,16 @@ export function analyzeTileset(image, manifest = {}) {
     for (let c = from; c < to; c++) if (filled(c, row)) cols.push(c);
     return cols;
   };
+  // Average luma of (mostly) opaque pixels over several tiles of a row
+  const luma = (cols, row) => {
+    let total = 0, weight = 0;
+    for (const col of cols) for (let y = row * tile; y < (row + 1) * tile; y++) for (let x = col * tile; x < (col + 1) * tile; x++) {
+      const i = (y * width + x) * 4, a = data[i + 3] / 255;
+      if (a < 0.5) continue;
+      total += (0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]) * a; weight += a;
+    }
+    return weight ? total / weight : 0;
+  };
   // Average colour of opaque pixels in a tile
   const average = (col, row) => {
     let r = 0, g = 0, b = 0, count = 0;
@@ -95,6 +110,17 @@ export function analyzeTileset(image, manifest = {}) {
       .filter(({ col, size }) => filled(col, base + ROW.landmarks, size, size))
       .map(({ col, size }) => ({ col, size }));
 
+    // Contrast between dark modules (walls, special walls) and light ones (plain ground)
+    const masks = Array.from({ length: 16 }, (_, m) => m);
+    const light = luma(plain, base + ROW.ground);
+    const dark = Math.max(luma(masks, base + ROW.wall), specialComplete ? luma(masks, base + ROW.special) : 0);
+    const delta = light - dark;
+    const contrast = {
+      dark: Math.round(dark), light: Math.round(light), delta: Math.round(delta),
+      level: delta >= CONTRAST.good ? "good" : delta >= CONTRAST.weak ? "weak" : "bad",
+      inverted: delta < 0,
+    };
+
     // UI accent: the wall colour, lightened
     const accent = average(15, base + ROW.wall).map((v) => Math.round(v + (255 - v) * 0.55));
 
@@ -111,6 +137,7 @@ export function analyzeTileset(image, manifest = {}) {
       ground: { plain, decor: range(GROUND_SLOTS.decor, base + ROW.ground) },
       props,
       landmarks,
+      contrast,
       accent: `rgb(${accent.join(" ")})`,
     });
   }

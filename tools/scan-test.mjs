@@ -14,7 +14,8 @@ const manifestPath = sheetPath.replace(/\.png$/, ".json");
 const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, "utf8")) : {};
 const tileset = analyzeTileset(sheet, manifest);
 for (const w of tileset.worlds) {
-  console.log(`${w.label}: ${w.ground.plain.length}+${w.ground.decor.length} sols, ${w.props.length} habitants, ${w.landmarks.length} bâtiments`);
+  const c = w.contrast;
+  console.log(`${w.label}: ${w.ground.plain.length}+${w.ground.decor.length} sols, ${w.props.length} habitants, ${w.landmarks.length} bâtiments, contraste ${c.delta}/255 (${c.level})`);
 }
 
 function render(map) {

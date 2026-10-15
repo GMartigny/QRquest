@@ -145,9 +145,23 @@ const fileEl = $("#tileset-file");
 const tilesetNameEl = $("#tileset-name");
 const resetEl = $("#tileset-reset");
 
+const warningsEl = $("#tileset-warnings");
+
 function describe(tileset, name) {
   const n = tileset.worlds.length;
   tilesetNameEl.textContent = `${name} · ${n} monde${n > 1 ? "s" : ""} · tuiles ${tileset.tile}px`;
+  // Contrast check between the average dark (walls) and light (ground) tiles
+  const issues = tileset.worlds.filter((w) => w.contrast.level !== "good").map((w) => {
+    const { delta, dark, light, inverted, level } = w.contrast;
+    const li = document.createElement("li");
+    li.className = level;
+    li.textContent = inverted
+      ? `⚠ ${w.label} : les murs (${dark}) sont plus clairs que le sol (${light}). Le QR sera inversé, beaucoup de lecteurs le refuseront.`
+      : `⚠ ${w.label} : contraste ${level === "bad" ? "insuffisant" : "faible"} entre murs et sol (écart ${delta}/255, conseillé ≥ 140). Le QR risque de ne pas se lire.`;
+    return li;
+  });
+  warningsEl.replaceChildren(...issues);
+  warningsEl.hidden = !issues.length;
 }
 
 // the visible "Charger" label opens the hidden file input from the keyboard too

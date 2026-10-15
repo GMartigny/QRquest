@@ -48,7 +48,9 @@ La transparence partielle (canal alpha) est prise en compte, par exemple pour un
 
 La couleur d'accent de l'interface est tirée de la couleur des murs de chaque monde.
 
-Pour vérifier un tileset maison : `node tools/scan-test.mjs chemin/vers/tiles.png` affiche ce qui a été détecté et le taux de QR lus. Garder des murs sombres, un sol clair et des habitants qui respectent la luminosité de leur case : c'est ce contraste qui rend le QR scannable.
+Au chargement, l'app compare la luminosité moyenne des murs (cases sombres) et du sol simple (cases claires) de chaque monde, et avertit si l'écart est faible (< 140/255), insuffisant (< 100/255) ou inversé. Ces seuils viennent de mesures avec jsQR : ≥ 140 se lit de façon fiable, la lecture chute nettement en dessous.
+
+Pour vérifier un tileset maison en ligne de commande : `node tools/scan-test.mjs chemin/vers/tiles.png` affiche ce qui a été détecté, le contraste et le taux de QR lus. Garder des murs sombres, un sol clair et des habitants qui respectent la luminosité de leur case : c'est ce contraste qui rend le QR scannable.
 
 Le tileset par défaut est généré par `npm run tiles` (`tools/generate-tiles.mjs`) et placé dans le domaine public (CC0).
 
