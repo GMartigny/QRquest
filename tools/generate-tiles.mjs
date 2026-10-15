@@ -5,6 +5,7 @@ import { PNG } from "pngjs";
 import {
   TILE, COLUMNS, ROWS_PER_THEME, THEMES, N, E, S, W, themeRow,
 } from "../src/tileset.js";
+import { PROPS } from "./props.mjs";
 
 const width = TILE * COLUMNS;
 const height = TILE * ROWS_PER_THEME * THEMES.length;
@@ -259,6 +260,43 @@ const themes = {
 };
 
 THEMES.forEach(({ id }) => themes[id]());
+
+// ---------- props ----------
+function drawSprite(col, row, { rows, pal }) {
+  rows.forEach((line, y) => {
+    [...line].forEach((ch, x) => { if (ch !== ".") put(col, row, x, y, pal[ch]); });
+  });
+}
+
+// Luminance check: a prop must not flip its module (jsQR uses Rec. 709 luma).
+const luma = (i) => 0.2126 * png.data[i] + 0.7152 * png.data[i + 1] + 0.0722 * png.data[i + 2];
+function composite(propCol, propRow, baseCol, baseRow, region) {
+  let total = 0, count = 0;
+  for (let y = region; y < TILE - region; y++) for (let x = region; x < TILE - region; x++) {
+    const pi = ((propRow * TILE + y) * width + propCol * TILE + x) * 4;
+    const bi = ((baseRow * TILE + y) * width + baseCol * TILE + x) * 4;
+    total += luma(png.data[pi + 3] ? pi : bi); count++;
+  }
+  return total / count;
+}
+
+let bad = 0;
+THEMES.forEach((theme, t) => {
+  theme.props.forEach((prop, col) => {
+    const sprite = PROPS[prop.id];
+    if (!sprite) throw new Error(`Missing sprite ${prop.id}`);
+    drawSprite(col, themeRow(t, "props"), sprite);
+    const ground = prop.slot === "ground";
+    const baseRow = themeRow(t, ground ? "ground" : "wall");
+    const baseCol = ground ? 0 : 15;
+    const full = composite(col, themeRow(t, "props"), baseCol, baseRow, 0);
+    const center = composite(col, themeRow(t, "props"), baseCol, baseRow, 4);
+    const ok = ground ? full > 165 && center > 150 : full < 90 && center < 85;
+    if (!ok) bad++;
+    console.log(`${ok ? "ok  " : "BAD "} ${theme.id}/${prop.id.padEnd(9)} ${prop.slot.padEnd(10)} luma ${full.toFixed(0)} (centre ${center.toFixed(0)})`);
+  });
+});
+if (bad) { console.error(`${bad} prop(s) would change their module's colour`); process.exit(1); }
 
 mkdirSync(new URL("../public/", import.meta.url), { recursive: true });
 writeFileSync(new URL("../public/tiles.png", import.meta.url), PNG.sync.write(png));

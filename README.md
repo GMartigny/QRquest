@@ -17,6 +17,7 @@ npm run tiles    # régénère public/tiles.png
 - `src/qrmap.js` encode le texte (UTF-8) avec `qrcode-generator`, puis transforme la matrice en opérations de dessin : une tuile de sol sous chaque case, et pour chaque module sombre une tuile de mur choisie selon ses voisins (masque N=1, E=2, S=4, O=8 → 16 variantes).
 - Les motifs de repérage (coins) et d'alignement utilisent une famille de tuiles « spéciale » (ruines, obsidienne, glace).
 - Le sol varie aléatoirement (graine relançable) avec quelques décorations.
+- Chaque monde a ses habitants (ligne 3 du tileset) : panneau, champignon, lapin, chouette… en forêt ; crâne, potion, clé, torche, bannière, toile d’araignée au donjon ; renard blanc, bonhomme de neige, luge, lanterne, écureuil, rouge-gorge en toundra. Ils sont placés au hasard sur des cases sûres : clairière (sol entouré de sol, loin des motifs de repérage), mur, ou façade de mur (rien en dessous). `npm run tiles` vérifie qu’aucun ne change la luminosité de sa case.
 
 ## Tileset
 
@@ -27,6 +28,7 @@ npm run tiles    # régénère public/tiles.png
 | 0 | 16 tuiles de mur, index = masque des voisins |
 | 1 | 16 tuiles « spéciales » (motifs de repérage), même masque |
 | 2 | sol : 4 variantes simples puis 4 décorées |
+| 3 | habitants, dans l’ordre de `props` du thème |
 
 Tuiles de 16×16 px. Les coins arrondis sont transparents pour laisser voir le sol. Garder des murs sombres et un sol clair : c'est ce contraste qui rend le QR scannable.
 

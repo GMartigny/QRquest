@@ -48,7 +48,7 @@ for (const [t, theme] of THEMES.entries()) {
   for (const ecl of ["L", "M", "Q", "H"]) {
     for (const [i, text] of samples.entries()) {
       for (const seed of [1, 42]) {
-        const map = buildMap(text, { ecl, theme: t, seed });
+        const map = buildMap(text, { ecl, theme: t, seed, props: seed === 42 ? 0.15 : 0.07 });
         const png = render(map);
         for (const f of FACTORS) {
           const [data, w] = downscale(png, f);

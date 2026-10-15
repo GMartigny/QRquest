@@ -1,5 +1,5 @@
 import qrcode from "qrcode-generator";
-import { TILE, N, E, S, W, GROUND_PLAIN, GROUND_DECOR, themeRow } from "./tileset.js";
+import { TILE, N, E, S, W, GROUND_PLAIN, GROUND_DECOR, THEMES, themeRow } from "./tileset.js";
 
 // Encode text as UTF-8 bytes (accents, emoji…) instead of the library's Latin-1 default.
 const encoder = new TextEncoder();
@@ -45,7 +45,7 @@ function specialMap(n, version) {
  * Turns text into a tile map: a list of draw operations from the spritesheet.
  * @returns {{ n:number, version:number, cells:number, size:number, ops:{sx,sy,dx,dy}[] }}
  */
-export function buildMap(text, { ecl = "Q", quiet = 2, seed = 1, theme = 0, decor = 0.22 } = {}) {
+export function buildMap(text, { ecl = "Q", quiet = 2, seed = 1, theme = 0, decor = 0.22, props = 0.07 } = {}) {
   const qr = qrcode(0, ecl);
   qr.addData(text, "Byte");
   qr.make();
@@ -58,16 +58,39 @@ export function buildMap(text, { ecl = "Q", quiet = 2, seed = 1, theme = 0, deco
   const cells = n + quiet * 2;
   const ops = [];
   const groundRow = themeRow(theme, "ground");
+  const propRow = themeRow(theme, "props");
+  const propList = THEMES[theme].props.map((p, col) => ({ ...p, col }));
+  const bySlot = (...slots) => propList.filter((p) => slots.includes(p.slot));
+  const groundProps = bySlot("ground");
+
+  // Props live on "safe" cells only: a ground prop needs a clearing (4 light
+  // neighbours) away from the finder/alignment patterns, a wall-front prop needs
+  // the bottom face of the wall to be exposed.
+  const nearSpecial = (r, c) => {
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const rr = r + dr, cc = c + dc;
+      if (rr >= 0 && cc >= 0 && rr < n && cc < n && special[rr][cc]) return true;
+    }
+    return false;
+  };
+  const pickProp = (x, y, candidates) => {
+    if (!candidates.length || hash(x + 101, y + 53, seed) >= props) return null;
+    return candidates[Math.floor(hash(y + 7, x + 211, seed) * candidates.length)];
+  };
 
   for (let y = 0; y < cells; y++) {
     for (let x = 0; x < cells; x++) {
       const r = y - quiet, c = x - quiet;
       // ground under every cell (rounded wall corners let it show through)
       const h = hash(x, y, seed);
-      const variant = h < decor
+      const clearing = !kind(r, c) && !kind(r - 1, c) && !kind(r + 1, c) && !kind(r, c - 1) && !kind(r, c + 1)
+        && !nearSpecial(r, c);
+      const groundProp = clearing ? pickProp(x, y, groundProps) : null;
+      const variant = groundProp ? Math.floor(hash(x + 31, y + 17, seed) * GROUND_PLAIN) : h < decor
         ? GROUND_PLAIN + Math.floor(hash(y, x, seed + 7) * GROUND_DECOR)
         : Math.floor(hash(x + 31, y + 17, seed) * GROUND_PLAIN);
       ops.push({ sx: variant * TILE, sy: groundRow * TILE, dx: x * TILE, dy: y * TILE });
+      if (groundProp) ops.push({ sx: groundProp.col * TILE, sy: propRow * TILE, dx: x * TILE, dy: y * TILE });
 
       const k = kind(r, c);
       if (!k) continue;
@@ -77,6 +100,11 @@ export function buildMap(text, { ecl = "Q", quiet = 2, seed = 1, theme = 0, deco
       if (kind(r + 1, c) === k) mask |= S;
       if (kind(r, c - 1) === k) mask |= W;
       ops.push({ sx: mask * TILE, sy: themeRow(theme, k) * TILE, dx: x * TILE, dy: y * TILE });
+
+      if (k === "wall") {
+        const wallProp = pickProp(x, y, bySlot("wall", ...(mask & S ? [] : ["wall-front"])));
+        if (wallProp) ops.push({ sx: wallProp.col * TILE, sy: propRow * TILE, dx: x * TILE, dy: y * TILE });
+      }
     }
   }
   return { n, version, cells, size: cells * TILE, ops };
