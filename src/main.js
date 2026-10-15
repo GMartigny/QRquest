@@ -1,6 +1,5 @@
 import "@fontsource/press-start-2p";
 import "./style.css";
-import { buildMap, drawMap } from "./qrmap.js";
 import { analyzeTileset } from "./tileset.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -10,6 +9,8 @@ const textEl = $("#text");
 const errorEl = $("#error");
 const worldsEl = $("#themes");
 const PREVIEW_SCALE = 2;
+const API = "/api/qr";
+const MAX_UPLOAD = 4 * 1024 * 1024; // the API refuses bigger tilesets
 
 const store = {
   get(key, fallback) { try { return localStorage.getItem(`qrquest.${key}`) ?? fallback; } catch { return fallback; } },
@@ -20,12 +21,12 @@ const state = {
   world: Number(store.get("theme", 0)) || 0,
   ecl: store.get("ecl", "Q"),
   seed: 1,
-  map: null,
-  tileset: null,
+  rendered: false,
+  tileset: null,  // analysed locally: world list, accents, contrast warnings
+  upload: null,   // { file, names } when a custom tileset is used (sent to the API)
 };
 textEl.value = store.get("text", textEl.value);
 
-let sheet = null; // current spritesheet image
 
 function showError(message) {
   errorEl.textContent = message;
@@ -46,9 +47,9 @@ async function loadTileset(src, manifest = {}) {
   return { image, tileset: analyzeTileset(pixels, await manifest) };
 }
 
-function useTileset({ image, tileset }) {
-  sheet = image;
+function useTileset({ tileset }, upload = null) {
   state.tileset = tileset;
+  state.upload = upload;
   state.world = Math.min(state.world, tileset.worlds.length - 1);
   buildWorldButtons();
   syncButtons();
@@ -77,31 +78,60 @@ function syncButtons() {
   if (world) document.documentElement.style.setProperty("--theme", world.accent);
 }
 
-function render() {
+// Ask the API for the PNG (GET with the default tileset, POST with a custom one)
+function request(scale, signal) {
+  const params = new URLSearchParams({
+    text: textEl.value, world: state.world, ecl: state.ecl, seed: state.seed, scale,
+  });
+  if (!state.upload) return fetch(`${API}?${params}`, { signal });
+  if (state.upload.names) params.set("names", state.upload.names.join(","));
+  return fetch(`${API}?${params}`, {
+    method: "POST", body: state.upload.file, headers: { "Content-Type": "image/png" }, signal,
+  });
+}
+
+async function readError(res) {
+  try { return (await res.json()).error; } catch { return `Erreur ${res.status}`; }
+}
+
+let pending = null;
+async function render() {
   if (!state.tileset) return;
   const text = textEl.value;
   if (!text) return showError("Il faut un message pour lancer la quête.");
+  pending?.abort();
+  const controller = (pending = new AbortController());
   try {
-    state.map = buildMap(text, { tileset: state.tileset, world: state.world, ecl: state.ecl, seed: state.seed });
-  } catch {
-    return showError("Message trop long pour ce niveau de résistance.");
+    const res = await request(PREVIEW_SCALE, controller.signal);
+    if (!res.ok) return showError(await readError(res));
+    const bitmap = await createImageBitmap(await res.blob());
+    if (controller.signal.aborted) return;
+    showError("");
+    // drawn at ×2; CSS shows it at ×1 on mobile, ×2 on desktop (see --qr-size)
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.style.setProperty("--qr-size", `${bitmap.width / PREVIEW_SCALE}px`);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(bitmap, 0, 0);
+    canvas.classList.add("on"); // first draw switches the "CRT" on (animation runs once)
+    state.rendered = true;
+    canvas.setAttribute("aria-label", `QR code : ${text}`);
+    const n = res.headers.get("X-QR-Modules");
+    $("#hud-level").textContent = `NIV. ${res.headers.get("X-QR-Version")}`;
+    $("#hud-size").textContent = `${n}×${n}`;
+    store.set("text", text);
+    store.set("theme", state.world);
+    store.set("ecl", state.ecl);
+  } catch (err) {
+    if (err.name !== "AbortError") showError("Impossible de joindre l'API de rendu.");
   }
-  showError("");
-  const { map } = state;
-  // drawn at ×2; CSS shows it at ×1 on mobile, ×2 on desktop (see --qr-size)
-  canvas.width = canvas.height = map.size * PREVIEW_SCALE;
-  canvas.style.setProperty("--qr-size", `${map.size}px`);
-  drawMap(ctx, map, sheet, PREVIEW_SCALE);
-  canvas.classList.add("on"); // first draw switches the "CRT" on (animation runs once)
-  canvas.setAttribute("aria-label", `QR code : ${text}`);
-  $("#hud-level").textContent = `NIV. ${map.version}`;
-  $("#hud-size").textContent = `${map.n}×${map.n}`;
-  store.set("text", text);
-  store.set("theme", state.world);
-  store.set("ecl", state.ecl);
 }
 
-textEl.addEventListener("input", render);
+// typing: wait for a short pause before calling the API
+let typingTimer;
+const renderSoon = () => { clearTimeout(typingTimer); typingTimer = setTimeout(render, 250); };
+
+textEl.addEventListener("input", renderSoon);
 
 worldsEl.addEventListener("click", (e) => {
   const b = e.target.closest("button");
@@ -124,21 +154,25 @@ $("#reroll").addEventListener("click", () => {
   render();
 });
 
-$("#download").addEventListener("click", () => {
-  if (!state.map) return;
-  const scale = Number($("#scale").value);
-  const out = document.createElement("canvas");
-  out.width = out.height = state.map.size * scale;
-  drawMap(out.getContext("2d"), state.map, sheet, scale);
-  const name = state.tileset.worlds[state.world].label
-    .normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  out.toBlob((blob) => {
+$("#download").addEventListener("click", async () => {
+  if (!state.rendered) return;
+  const button = $("#download");
+  button.disabled = true;
+  try {
+    const res = await request(Number($("#scale").value));
+    if (!res.ok) return showError(await readError(res));
+    const name = state.tileset.worlds[state.world].label
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
+    a.href = URL.createObjectURL(await res.blob());
     a.download = `qrquest-${name}.png`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  }, "image/png");
+  } catch {
+    showError("Impossible de joindre l'API de rendu.");
+  } finally {
+    button.disabled = false;
+  }
 });
 
 // ---------- custom tileset ----------
@@ -176,11 +210,13 @@ fileEl.addEventListener("change", async () => {
   const png = files.find((f) => f.type.startsWith("image/"));
   const json = files.find((f) => f.name.endsWith(".json"));
   if (!png) return showError("Choisis une image PNG (et éventuellement son fichier .json de noms).");
+  if (png.size > MAX_UPLOAD) return showError("Tileset trop lourd : 4 Mo maximum.");
   const url = URL.createObjectURL(png);
   try {
     const manifest = json ? JSON.parse(await json.text()) : {};
     const loaded = await loadTileset(url, manifest);
-    useTileset(loaded);
+    URL.revokeObjectURL(url);
+    useTileset(loaded, { file: png, names: manifest.worlds || null });
     describe(loaded.tileset, png.name);
     resetEl.hidden = false;
   } catch (err) {

@@ -7,6 +7,7 @@ import { PNG } from "pngjs";
 import jsQR from "jsqr";
 import { buildMap } from "../src/qrmap.js";
 import { analyzeTileset } from "../src/tileset.js";
+import { renderMap } from "../src/render.js";
 
 const sheetPath = process.argv.slice(2).find((a) => !a.startsWith("--")) || new URL("../public/tiles.png", import.meta.url).pathname;
 const sheet = PNG.sync.read(readFileSync(sheetPath));
@@ -19,18 +20,8 @@ for (const w of tileset.worlds) {
 }
 
 function render(map) {
-  const out = new PNG({ width: map.size, height: map.size });
-  for (const { sx, sy, dx, dy, w, h } of map.ops) {
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const si = ((sy + y) * sheet.width + sx + x) * 4;
-      const a = sheet.data[si + 3] / 255;
-      if (!a) continue; // transparent: keep what's below
-      const di = ((dy + y) * map.size + dx + x) * 4;
-      for (let k = 0; k < 3; k++) out.data[di + k] = Math.round(sheet.data[si + k] * a + out.data[di + k] * (1 - a));
-      out.data[di + 3] = 255;
-    }
-  }
-  return out;
+  const img = renderMap(sheet, map, 1);
+  return { width: img.width, height: img.height, data: Buffer.from(img.data.buffer) };
 }
 
 function downscale(png, f) {
@@ -70,7 +61,7 @@ for (const [t, theme] of tileset.worlds.entries()) {
             console.log(`FAIL ${theme.label} ecl=${ecl} sample=${i} seed=${seed} v${map.version} ${(tileset.tile / f).toFixed(1)}px/module`);
           }
         }
-        if (outDir && seed === 1 && ecl === "Q" && i < 2) writeFileSync(new URL(`world${t + 1}-${i}.png`, outDir), PNG.sync.write(png));
+        if (outDir && seed === 1 && ecl === "Q" && i < 2) { const out = new PNG({ width: png.width, height: png.height }); out.data = png.data; writeFileSync(new URL(`world${t + 1}-${i}.png`, outDir), PNG.sync.write(out)); }
       }
     }
   }

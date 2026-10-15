@@ -1,0 +1,5 @@
+{
+  "functions": {
+    "api/qr.js": { "includeFiles": "public/tiles.{png,json}", "maxDuration": 10 }
+  }
+}

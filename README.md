@@ -6,15 +6,39 @@ Générateur de QR codes en pixel art : chaque module du QR devient une tuile d'
 
 ```bash
 npm install
-npm run dev      # serveur local
+npm run dev      # serveur local (site + API sur /api/qr)
 npm run build    # build de production dans dist/
 npm test         # vérifie qu'au moins 99 % des QR rendus se décodent (jsQR)
 npm run tiles    # régénère public/tiles.png
 ```
 
+## API
+
+Le rendu se fait côté serveur, dans `api/qr.js` (fonction Vercel). Le site l'appelle, et n'importe qui peut l'utiliser directement :
+
+```bash
+# tileset par défaut → PNG
+curl -o qr.png "https://qrquest-rpg.vercel.app/api/qr?text=Bonjour&world=Donjon&ecl=H&scale=4"
+
+# tileset personnel (corps = PNG, 4 Mo max), noms des mondes optionnels
+curl -o qr.png --data-binary @mon-tileset.png -H "Content-Type: image/png" \
+  "https://qrquest-rpg.vercel.app/api/qr?text=Bonjour&world=0&names=Plage,Volcan"
+```
+
+| Paramètre | Défaut | Rôle |
+| --- | --- | --- |
+| `text` | — | contenu du QR (1200 caractères max) |
+| `world` | `0` | index du monde ou son nom |
+| `ecl` | `Q` | correction d'erreur : `L`, `M`, `Q` ou `H` |
+| `seed` | `1` | graine du décor (mêmes paramètres → même image) |
+| `scale` | `1` | agrandissement entier de 1 à 8 (image limitée à 4096 px) |
+| `names` | — | (POST) noms des mondes séparés par des virgules |
+
+La réponse est un `image/png` avec les en-têtes `X-QR-Version`, `X-QR-Modules`, `X-QR-World` et `X-QR-Worlds`. En cas d'erreur, l'API renvoie `{ "error": "…" }` avec un code 4xx. Les réponses GET sont mises en cache, et CORS est ouvert.
+
 ## Fonctionnement
 
-- `src/qrmap.js` encode le texte (UTF-8) avec `qrcode-generator`, puis transforme la matrice en opérations de dessin : une tuile de sol sous chaque case, et pour chaque module sombre une tuile de mur choisie selon ses voisins (masque N=1, E=2, S=4, O=8 → 16 variantes).
+- `src/qrmap.js` (partagé par l'API et les outils) encode le texte (UTF-8) avec `qrcode-generator`, puis transforme la matrice en opérations de dessin : une tuile de sol sous chaque case, et pour chaque module sombre une tuile de mur choisie selon ses voisins (masque N=1, E=2, S=4, O=8 → 16 variantes).
 - Les motifs de repérage (coins) et d'alignement utilisent une famille de tuiles « spéciale » (ruines, obsidienne, glace).
 - Le sol varie aléatoirement (graine relançable) avec quelques décorations.
 - Chaque monde a ses habitants : panneau, champignon, lapin, chouette… en forêt ; crâne, potion, clé, torche, bannière, toile d’araignée au donjon ; renard blanc, bonhomme de neige, luge, lanterne, écureuil, rouge-gorge en toundra. Ils sont placés au hasard sur des cases sûres : clairière (sol entouré de sol, loin des motifs de repérage), mur, ou façade de mur (rien en dessous). `npm run tiles` vérifie qu’aucun ne change la luminosité de sa case.
@@ -22,7 +46,7 @@ npm run tiles    # régénère public/tiles.png
 
 ## Tileset
 
-Le tileset se remplace sans toucher au code. Dans l'interface, **📂 Charger** utilise ton PNG (sélectionne aussi son `.json` pour nommer les mondes) le temps de la session, et **⬇ Modèle** télécharge le tileset par défaut comme point de départ. Pour changer le tileset du site, déposer un autre `public/tiles.png` (et éventuellement `public/tiles.json`). L'application lit l'image et en déduit tout le reste :
+Le tileset se remplace sans toucher au code. Dans l'interface, **📂 Charger** utilise ton PNG (sélectionne aussi son `.json` pour nommer les mondes) le temps de la session, et **⬇ Modèle** télécharge le tileset par défaut comme point de départ. Le PNG est envoyé à l'API pour le rendu, et l'analyse (mondes, contraste) se fait aussi dans le navigateur pour l'interface. Pour changer le tileset du site, déposer un autre `public/tiles.png` (et éventuellement `public/tiles.json`). L'application lit l'image et en déduit tout le reste :
 
 - **taille des tuiles** = largeur ÷ 16 (16 px, 32 px…) ;
 - **nombre de mondes** = hauteur ÷ (13 × taille de tuile) — une bande de 13 rangées par monde ;
