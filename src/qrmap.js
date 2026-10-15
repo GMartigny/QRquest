@@ -25,10 +25,9 @@ function hash(x, y, seed) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-// Share of the symbol's modules that landmarks may cover, by error correction
-// level. Kept well under each level's recovery capacity (7/15/25/30 %) because a
-// covered module can spoil a whole 8-module codeword.
-export const LANDMARK_BUDGET = { L: 0.004, M: 0.01, Q: 0.02, H: 0.028 };
+// Share of the symbol's modules covered by landmarks, by error correction level.
+// Linear progression, calibrated with tools/scan-test.mjs (≥ 99 % decoded).
+export const LANDMARK_COVERAGE = { L: 0.015, M: 0.035, Q: 0.055, H: 0.075 };
 
 function mulberry32(seed) {
   return () => {
@@ -52,15 +51,14 @@ function forbiddenMap(n, version, special) {
 
 // Picks random spots for landmarks within the module budget; no overlaps.
 function placeLandmarks(n, version, special, { ecl, list, seed, amount }) {
-  let budget = Math.floor(n * n * (LANDMARK_BUDGET[ecl] ?? 0) * amount);
-  // sparing: roughly one landmark per dozen modules of width
-  let count = Math.max(1, Math.round((n / 12) * amount));
-  if (!list.length || budget < 4) return { placed: [], taken: null };
+  let budget = Math.round(n * n * (LANDMARK_COVERAGE[ecl] ?? 0) * amount);
+  const smallest = Math.min(...list.map((lm) => lm.size * lm.size));
+  if (!list.length || budget < smallest) return { placed: [], taken: null };
   const forbidden = forbiddenMap(n, version, special);
   const taken = Array.from({ length: n }, () => new Array(n).fill(false));
   const rng = mulberry32(seed * 7919 + 13);
   const placed = [];
-  for (let tries = 0; tries < 400 && budget >= 4 && count > 0; tries++) {
+  for (let tries = 0; tries < 3000 && budget >= smallest; tries++) {
     const fits = list.filter((lm) => lm.size * lm.size <= budget);
     if (!fits.length) break;
     const lm = fits[Math.floor(rng() * fits.length)];
@@ -75,7 +73,6 @@ function placeLandmarks(n, version, special, { ecl, list, seed, amount }) {
     for (let r = r0; r < r0 + lm.size; r++) for (let c = c0; c < c0 + lm.size; c++) taken[r][c] = true;
     placed.push({ ...lm, r: r0, c: c0 });
     budget -= lm.size * lm.size;
-    count--;
   }
   return { placed, taken };
 }
@@ -103,7 +100,7 @@ function specialMap(n, version) {
  * @returns {{ n, version, cells, size, ops:{sx,sy,dx,dy,w,h}[], landmarks }}
  */
 export function buildMap(text, {
-  tileset, world = 0, ecl = "Q", quiet = 2, seed = 1, decor = 0.22, props = 0.07, landmarks = 4,
+  tileset, world = 0, ecl = "Q", quiet = 2, seed = 1, decor = 0.22, props = 0.07, landmarks = 1,
 } = {}) {
   if (!tileset) throw new Error("buildMap: tileset manquant (analyzeTileset)");
   const T = tileset.tile;
