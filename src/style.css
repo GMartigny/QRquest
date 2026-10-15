@@ -154,18 +154,30 @@ button.primary:hover { background: #ffd977; }
 footer { text-align: center; font-size: 8px; color: var(--muted); line-height: 1.8; }
 footer a { color: var(--theme); }
 
-/* CRT power-on: hard opacity cuts, no easing, no filters */
+/* CRT power-on: thin line stretching open while colour comes back,
+   then hard opacity cuts (no brightness, no fading between steps) */
 #qr:not(.on) { opacity: 0; }
-#qr.on { animation: crt-on 0.6s steps(1, end) both; }
-@keyframes crt-on {
-  0%   { opacity: 0; }
-  10%  { opacity: 1; }
-  18%  { opacity: 0; }
-  30%  { opacity: 0.6; }
+#qr.on {
+  transform-origin: center;
+  animation:
+    crt-stretch 0.75s cubic-bezier(0.2, 0.7, 0.3, 1) both,
+    crt-flicker 0.75s steps(1, end) both;
+}
+@keyframes crt-stretch {
+  0%   { transform: scale(0.6, 0.004); filter: saturate(0); }
+  14%  { transform: scale(1, 0.004);   filter: saturate(0); }
+  32%  { transform: scale(1, 1);       filter: saturate(0.4); }
+  52%  { filter: saturate(0.8); }
+  100% { transform: none; filter: none; }
+}
+@keyframes crt-flicker {
+  0%   { opacity: 1; }
   38%  { opacity: 0; }
-  50%  { opacity: 1; }
-  58%  { opacity: 0.3; }
-  66%  { opacity: 1; }
+  46%  { opacity: 1; }
+  54%  { opacity: 0; }
+  62%  { opacity: 0.6; }
+  70%  { opacity: 0; }
+  78%  { opacity: 1; }
   100% { opacity: 1; }
 }
 
