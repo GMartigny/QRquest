@@ -113,7 +113,7 @@ textarea:focus { border-color: var(--accent); }
 
 .choices { display: flex; flex-wrap: wrap; gap: 8px; }
 
-button, select {
+button, select, .button {
   font: inherit;
   font-size: 10px;
   color: var(--ink);
@@ -123,7 +123,12 @@ button, select {
   padding: 9px 12px;
   cursor: pointer;
 }
-button:hover, select:hover { background: #34488a; }
+.button { display: inline-block; text-decoration: none; line-height: normal; }
+button:hover, select:hover, .button:hover { background: #34488a; }
+.button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
+.button:focus-visible { outline: 2px dashed var(--accent); outline-offset: 3px; }
+.hint { margin: -2px 0 10px; font-size: 8px; line-height: 1.6; color: var(--muted); overflow-wrap: anywhere; }
+[hidden] { display: none !important; }
 button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
 button:focus-visible, select:focus-visible { outline: 2px dashed var(--accent); outline-offset: 3px; }
 button[aria-pressed="true"] { background: var(--theme); color: #0e1020; }

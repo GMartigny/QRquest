@@ -25,26 +25,40 @@ const state = {
 };
 textEl.value = store.get("text", textEl.value);
 
-const sheet = new Image();
+let sheet = null; // current spritesheet image
 
 function showError(message) {
   errorEl.textContent = message;
   errorEl.hidden = !message;
 }
 
-// Load the spritesheet + optional names, then discover its worlds.
-async function loadTileset() {
-  sheet.src = "/tiles.png";
-  const manifest = fetch("/tiles.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
-  await sheet.decode();
+// Load a spritesheet (URL) + optional names, then discover its worlds.
+async function loadTileset(src, manifest = {}) {
+  const image = new Image();
+  image.src = src;
+  await image.decode();
   const probe = document.createElement("canvas");
-  probe.width = sheet.naturalWidth;
-  probe.height = sheet.naturalHeight;
+  probe.width = image.naturalWidth;
+  probe.height = image.naturalHeight;
   const pctx = probe.getContext("2d", { willReadFrequently: true });
-  pctx.drawImage(sheet, 0, 0);
+  pctx.drawImage(image, 0, 0);
   const pixels = pctx.getImageData(0, 0, probe.width, probe.height);
-  return analyzeTileset(pixels, await manifest);
+  return { image, tileset: analyzeTileset(pixels, await manifest) };
 }
+
+function useTileset({ image, tileset }) {
+  sheet = image;
+  state.tileset = tileset;
+  state.world = Math.min(state.world, tileset.worlds.length - 1);
+  buildWorldButtons();
+  syncButtons();
+  render();
+}
+
+const defaultTileset = () => loadTileset(
+  "/tiles.png",
+  fetch("/tiles.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
+);
 
 function buildWorldButtons() {
   worldsEl.replaceChildren(...state.tileset.worlds.map((w) => {
@@ -126,13 +140,48 @@ $("#download").addEventListener("click", () => {
   }, "image/png");
 });
 
+// ---------- custom tileset ----------
+const fileEl = $("#tileset-file");
+const tilesetNameEl = $("#tileset-name");
+const resetEl = $("#tileset-reset");
+
+function describe(tileset, name) {
+  const n = tileset.worlds.length;
+  tilesetNameEl.textContent = `${name} · ${n} monde${n > 1 ? "s" : ""} · tuiles ${tileset.tile}px`;
+}
+
+// the visible "Charger" label opens the hidden file input from the keyboard too
+document.querySelector('label[for="tileset-file"]').addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileEl.click(); }
+});
+
+fileEl.addEventListener("change", async () => {
+  const files = [...fileEl.files];
+  fileEl.value = "";
+  const png = files.find((f) => f.type.startsWith("image/"));
+  const json = files.find((f) => f.name.endsWith(".json"));
+  if (!png) return showError("Choisis une image PNG (et éventuellement son fichier .json de noms).");
+  const url = URL.createObjectURL(png);
+  try {
+    const manifest = json ? JSON.parse(await json.text()) : {};
+    const loaded = await loadTileset(url, manifest);
+    useTileset(loaded);
+    describe(loaded.tileset, png.name);
+    resetEl.hidden = false;
+  } catch (err) {
+    URL.revokeObjectURL(url);
+    showError(`Tileset invalide : ${err.message}`);
+  }
+});
+
+resetEl.addEventListener("click", async () => {
+  const loaded = await defaultTileset();
+  useTileset(loaded);
+  describe(loaded.tileset, "Par défaut");
+  resetEl.hidden = true;
+});
+
 syncButtons();
-loadTileset()
-  .then((tileset) => {
-    state.tileset = tileset;
-    state.world = Math.min(state.world, tileset.worlds.length - 1);
-    buildWorldButtons();
-    syncButtons();
-    render();
-  })
+defaultTileset()
+  .then((loaded) => { useTileset(loaded); describe(loaded.tileset, "Par défaut"); })
   .catch((err) => showError(`Tileset invalide : ${err.message}`));

@@ -22,7 +22,7 @@ npm run tiles    # régénère public/tiles.png
 
 ## Tileset
 
-Le tileset se remplace sans toucher au code : déposer un autre `public/tiles.png` (et éventuellement `public/tiles.json`). L'application lit l'image et en déduit tout le reste :
+Le tileset se remplace sans toucher au code. Dans l'interface, **📂 Charger** utilise ton PNG (sélectionne aussi son `.json` pour nommer les mondes) le temps de la session, et **⬇ Modèle** télécharge le tileset par défaut comme point de départ. Pour changer le tileset du site, déposer un autre `public/tiles.png` (et éventuellement `public/tiles.json`). L'application lit l'image et en déduit tout le reste :
 
 - **taille des tuiles** = largeur ÷ 16 (16 px, 32 px…) ;
 - **nombre de mondes** = hauteur ÷ (7 × taille de tuile) — une bande de 7 rangées par monde ;

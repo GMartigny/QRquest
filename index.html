@@ -34,6 +34,17 @@
       </fieldset>
 
       <fieldset>
+        <legend class="label">▶ Tileset</legend>
+        <p id="tileset-name" class="hint">Par défaut</p>
+        <div class="choices">
+          <label class="button" for="tileset-file" tabindex="0" role="button">📂 Charger</label>
+          <input type="file" id="tileset-file" accept="image/png,.json,application/json" multiple hidden />
+          <button type="button" id="tileset-reset" hidden>↺ Par défaut</button>
+          <a class="button" href="/tiles.png" download="qrquest-modele.png">⬇ Modèle</a>
+        </div>
+      </fieldset>
+
+      <fieldset>
         <legend class="label">▶ Résistance aux dégâts</legend>
         <div class="choices" id="ecl">
           <button type="button" data-ecl="L" title="~7 % de correction">L</button>
