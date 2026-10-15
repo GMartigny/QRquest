@@ -74,9 +74,9 @@ function render() {
   }
   showError("");
   const { map } = state;
-  // crisp ×2 preview (CSS shrinks it only when the viewport is too narrow)
+  // drawn at ×2; CSS shows it at ×1 on mobile, ×2 on desktop (see --qr-size)
   canvas.width = canvas.height = map.size * PREVIEW_SCALE;
-  canvas.style.width = `${map.size * PREVIEW_SCALE}px`;
+  canvas.style.setProperty("--qr-size", `${map.size}px`);
   drawMap(ctx, map, sheet, PREVIEW_SCALE);
   canvas.setAttribute("aria-label", `QR code : ${text}`);
   $("#hud-level").textContent = `NIV. ${map.version}`;
