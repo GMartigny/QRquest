@@ -101,7 +101,7 @@ function specialMap(n, version) {
  * Turns text into a tile map: a list of draw operations from the spritesheet.
  * @returns {{ n:number, version:number, cells:number, size:number, ops:{sx,sy,dx,dy}[] }}
  */
-export function buildMap(text, { ecl = "Q", quiet = 2, seed = 1, theme = 0, decor = 0.22, props = 0.07, landmarks = 1 } = {}) {
+export function buildMap(text, { ecl = "Q", quiet = 2, seed = 1, theme = 0, decor = 0.22, props = 0.07, landmarks = 4 } = {}) {
   const qr = qrcode(0, ecl);
   qr.addData(text, "Byte");
   qr.make();
