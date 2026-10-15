@@ -28,7 +28,7 @@ function hash(x, y, seed) {
 // Share of the symbol's modules that landmarks may cover, by error correction
 // level. Kept well under each level's recovery capacity (7/15/25/30 %) because a
 // covered module can spoil a whole 8-module codeword.
-const LANDMARK_BUDGET = { L: 0, M: 0.01, Q: 0.02, H: 0.028 };
+export const LANDMARK_BUDGET = { L: 0.004, M: 0.01, Q: 0.02, H: 0.028 };
 
 function mulberry32(seed) {
   return () => {
