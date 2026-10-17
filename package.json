@@ -1,7 +1,7 @@
 {
   "name": "qrquest",
   "version": "1.0.0",
-  "description": "Générateur de QR codes en pixel art façon écran de jeu vidéo RPG 2D",
+  "description": "Pixel-art QR code generator that looks like a 2D RPG game screen",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

@@ -2,7 +2,7 @@
 //
 //   GET  /api/qr?text=…[&world=0][&ecl=Q][&seed=1][&scale=4]
 //        → uses the site's default tileset
-//   POST /api/qr?text=…[&names=Forêt,Donjon][…]   (body: the tileset PNG)
+//   POST /api/qr?text=…[&names=Forest,Dungeon][…]   (body: the tileset PNG)
 //        → uses the uploaded tileset (≤ 4 MB)
 //
 // Response: image/png, plus headers X-QR-Version, X-QR-Modules, X-QR-World,
@@ -36,7 +36,7 @@ function readBody(req) {
     let size = 0;
     req.on("data", (c) => {
       size += c.length;
-      if (size > MAX_BODY) { reject(Object.assign(new Error("Tileset trop lourd (4 Mo max)."), { status: 413 })); req.destroy(); return; }
+      if (size > MAX_BODY) { reject(Object.assign(new Error("Tileset too large (4 MB max)."), { status: 413 })); req.destroy(); return; }
       chunks.push(c);
     });
     req.on("end", () => resolve(Buffer.concat(chunks)));
@@ -54,25 +54,25 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") { res.statusCode = 204; return res.end(); }
 
   try {
-    if (req.method !== "GET" && req.method !== "POST") throw fail(405, "Méthode non supportée (GET ou POST).");
+    if (req.method !== "GET" && req.method !== "POST") throw fail(405, "Unsupported method (use GET or POST).");
     const q = new URL(req.url, "http://localhost").searchParams;
 
     const text = q.get("text");
-    if (!text) throw fail(400, "Paramètre « text » manquant.");
-    if (text.length > MAX_TEXT) throw fail(400, `Texte trop long (${MAX_TEXT} caractères max).`);
+    if (!text) throw fail(400, "Missing \"text\" parameter.");
+    if (text.length > MAX_TEXT) throw fail(400, `Text too long (${MAX_TEXT} characters max).`);
     const ecl = (q.get("ecl") || "Q").toUpperCase();
-    if (!ECL.has(ecl)) throw fail(400, "« ecl » doit valoir L, M, Q ou H.");
+    if (!ECL.has(ecl)) throw fail(400, "\"ecl\" must be L, M, Q or H.");
     const seed = Number.parseInt(q.get("seed") || "1", 10) || 1;
 
     let sheet, tileset;
     if (req.method === "POST") {
       const body = await readBody(req);
-      if (!body.length) throw fail(400, "Corps vide : envoyer le PNG du tileset.");
-      try { sheet = PNG.sync.read(body); } catch { throw fail(400, "Le corps n'est pas un PNG lisible."); }
+      if (!body.length) throw fail(400, "Empty body: send the tileset PNG.");
+      try { sheet = PNG.sync.read(body); } catch { throw fail(400, "The body is not a readable PNG."); }
       const names = q.get("names");
       try {
         tileset = analyzeTileset(sheet, names ? { worlds: names.split(",").map((s) => s.trim()) } : {});
-      } catch (err) { throw fail(422, `Tileset invalide : ${err.message}`); }
+      } catch (err) { throw fail(422, `Invalid tileset: ${err.message}`); }
     } else {
       ({ sheet, tileset } = await loadDefault());
     }
@@ -80,13 +80,13 @@ export default async function handler(req, res) {
     const worldParam = q.get("world") ?? "0";
     let world = Number.parseInt(worldParam, 10);
     if (Number.isNaN(world)) world = tileset.worlds.findIndex((w) => w.label.toLowerCase() === worldParam.toLowerCase());
-    if (world < 0 || world >= tileset.worlds.length) throw fail(400, `Monde inconnu (0 à ${tileset.worlds.length - 1}).`);
+    if (world < 0 || world >= tileset.worlds.length) throw fail(400, `Unknown world (0 to ${tileset.worlds.length - 1}).`);
 
     let map;
     try {
       map = buildMap(text, { tileset, world, ecl, seed });
     } catch {
-      throw fail(400, "Texte trop long pour ce niveau de correction.");
+      throw fail(400, "Text too long for this error correction level.");
     }
     const maxScale = Math.max(1, Math.floor(MAX_SIDE / map.size));
     const scale = Math.min(Math.max(Number.parseInt(q.get("scale") || "1", 10) || 1, 1), 8, maxScale);
@@ -110,7 +110,7 @@ export default async function handler(req, res) {
     res.statusCode = err.status || 500;
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
-    res.end(JSON.stringify({ error: err.status ? err.message : "Erreur interne." }));
+    res.end(JSON.stringify({ error: err.status ? err.message : "Internal error." }));
     if (!err.status) console.error(err);
   }
 }

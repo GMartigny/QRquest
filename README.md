@@ -1,6 +1,6 @@
 # QRquest
 
-A pixel-art QR code generator: every module of the QR code becomes a tile of a 2D RPG map (forest, dungeon, tundra), with autotiling so that walls connect to each other.
+A pixel-art QR code generator: every module of the QR code becomes a tile of a 2D RPG map (Forest, Dungeon, Tundra), with autotiling so that walls connect to each other.
 
 ## Getting started
 
@@ -33,11 +33,11 @@ In both cases, options go in the URL (query string).
 | Parameter | If missing | Purpose |
 | --- | --- | --- |
 | `text` | **required** | content of the QR code (1200 characters max, UTF-8: accents and emoji are fine) |
-| `world` | `0` (first world) | world index (`0`, `1`…) or its name, case-insensitive (`Donjon`, `toundra`…) |
+| `world` | `0` (first world) | world index (`0`, `1`…) or its name, case-insensitive (`Dungeon`, `tundra`…) |
 | `ecl` | `Q` | error correction level: `L` (~7%), `M` (~15%), `Q` (~25%), `H` (~30%). The higher it is, the bigger the QR code and the more landmarks it can hold |
 | `seed` | `1` | map seed. The same parameters always give the same image; change the seed for a different layout |
 | `scale` | `1` | integer, blur-free upscale from 1 to 8. Clamped to that range automatically, and capped so the image never exceeds 4096 px |
-| `names` | "Monde 1", "Monde 2"… | `POST` only: names of the uploaded tileset's worlds, comma-separated |
+| `names` | "World 1", "World 2"… | `POST` only: names of the uploaded tileset's worlds, comma-separated |
 
 Density settings (decorations, inhabitants, landmarks) are not parameters. The share of modules covered by landmarks depends on `ecl` only (see [How it works](#how-it-works)).
 
@@ -56,7 +56,7 @@ The image is `(modules + 4) × tile size × scale` pixels wide: the QR code plus
 
 ### Errors
 
-On error, the body is JSON, `{ "error": "message" }` (messages are in French):
+On error, the body is JSON, `{ "error": "message" }`:
 
 | Status | When |
 | --- | --- |
@@ -76,7 +76,7 @@ On error, the body is JSON, `{ "error": "message" }` (messages are in French):
 In an HTML page, with the default tileset:
 
 ```html
-<img src="https://qrquest-rpg.vercel.app/api/qr?text=https%3A%2F%2Fexample.com&world=Toundra&scale=2"
+<img src="https://qrquest-rpg.vercel.app/api/qr?text=https%3A%2F%2Fexample.com&world=Tundra&scale=2"
      alt="QR code to example.com" style="image-rendering: pixelated">
 ```
 
@@ -84,7 +84,7 @@ From the command line:
 
 ```bash
 # default tileset
-curl -o qr.png "https://qrquest-rpg.vercel.app/api/qr?text=Hello&world=Donjon&ecl=H&scale=4"
+curl -o qr.png "https://qrquest-rpg.vercel.app/api/qr?text=Hello&world=Dungeon&ecl=H&scale=4"
 
 # your own tileset, with its world names
 curl -o qr.png --data-binary @my-tileset.png -H "Content-Type: image/png" \
@@ -107,7 +107,7 @@ img.src = URL.createObjectURL(await res.blob());
 
 ### Limits
 
-- **Text**: 1200 characters. The real limit is in UTF-8 bytes: an accented letter counts as 2 bytes, an emoji as 4. 1200 unaccented characters fit even at `H`, but at `H` a fully accented text tops out around 630 characters. Beyond that, the API returns a 400 error ("Texte trop long pour ce niveau de correction").
+- **Text**: 1200 characters. The real limit is in UTF-8 bytes: an accented letter counts as 2 bytes, an emoji as 4. 1200 unaccented characters fit even at `H`, but at `H` a fully accented text tops out around 630 characters. Beyond that, the API returns a 400 error ("Text too long for this error correction level.").
 - **Uploaded tileset**: 4 MB max.
 - **Image**: 4096 px per side max. `scale` is reduced if needed.
 - **Scanning**: landmarks use up part of the error correction. In tests (jsQR), at least 99% of generated QR codes decode. For the most reliable scanning, prefer `ecl=H`.
@@ -122,7 +122,7 @@ img.src = URL.createObjectURL(await res.blob());
 
 ## Tileset
 
-The tileset can be swapped without touching the code. In the interface, **📂 Charger** (load) uses your PNG for the session (also select its `.json` to name the worlds), and **⬇ Modèle** (template) downloads the default tileset as a starting point. The PNG is sent to the API for rendering, and it is also analysed in the browser for the interface (worlds, contrast). To change the site's tileset, drop in another `public/tiles.png` (and optionally `public/tiles.json`). The app reads the image and works out everything else:
+The tileset can be swapped without touching the code. In the interface, **📂 Load** uses your PNG for the session (also select its `.json` to name the worlds), and **⬇ Template** downloads the default tileset as a starting point. The PNG is sent to the API for rendering, and it is also analysed in the browser for the interface (worlds, contrast). To change the site's tileset, drop in another `public/tiles.png` (and optionally `public/tiles.json`). The app reads the image and works out everything else:
 
 - **tile size** = width ÷ 16 (16 px, 32 px…);
 - **number of worlds** = height ÷ (13 × tile size): one band of 13 rows per world;
@@ -138,10 +138,10 @@ Layout of a band (columns 0 to 15):
 | 9 | inhabitants: columns 0-7 on the ground, 8-11 on a wall, 12-15 on a wall front (nothing below) |
 | 10-12 | landmarks: 3×3 slots at columns 0, 3 and 6; 2×2 slots at columns 9, 11 and 13 (rows 10-11) |
 
-World names (optional, otherwise "Monde 1", "Monde 2"…) go in `public/tiles.json`:
+World names (optional, otherwise "World 1", "World 2"…) go in `public/tiles.json`:
 
 ```json
-{ "worlds": ["Forêt", "Donjon", "Toundra"] }
+{ "worlds": ["Forest", "Dungeon", "Tundra"] }
 ```
 
 **2.5D rendering**: all the ground is drawn first, then the walls row by row. A wall therefore spills onto the neighbouring ground (shadow), and that spill is covered by any wall to its right or below. If the shadow is the wall's shape shifted down and to the right, two shadows never overlap. In the default tileset, only finder and alignment patterns are raised walls: a vertical front face when nothing is below, and a cast shadow. The other dark cells are flat tiles. Standing landmarks cast the same shadow as walls, drawn inside their slot (the crevasse and the ice-fishing hole, lying flat, have none).

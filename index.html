@@ -1,77 +1,77 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QRquest</title>
-  <meta name="description" content="Générateur de QR codes en pixel art, façon écran de RPG 2D." />
+  <meta name="description" content="Pixel-art QR code generator that looks like a 2D RPG game screen." />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
   <main class="console">
     <header class="title">
       <h1>QR<span>quest</span></h1>
-      <p class="press">Appuie sur START pour générer ta carte</p>
+      <p class="press">Press START to generate your map</p>
     </header>
 
-    <section class="screen" aria-label="QR code généré">
+    <section class="screen" aria-label="Generated QR code">
       <div class="hud">
         <span class="hearts" aria-hidden="true">♥♥♥</span>
-        <span id="hud-level">NIV. 1</span>
+        <span id="hud-level">LV. 1</span>
         <span id="hud-size">21×21</span>
       </div>
       <img id="qr" alt="QR code" />
     </section>
 
     <section class="dialog">
-      <label for="text" class="label">▶ Message de la quête</label>
+      <label for="text" class="label">▶ Quest message</label>
       <textarea id="text" rows="3" spellcheck="false" maxlength="1200">https://github.com/GMartigny/QRquest</textarea>
       <p id="error" class="error" hidden></p>
 
       <fieldset>
         <legend class="label">▶ Tileset</legend>
-        <p id="tileset-name" class="hint">Par défaut</p>
+        <p id="tileset-name" class="hint">Default</p>
         <ul id="tileset-warnings" class="warnings" hidden></ul>
         <div class="choices">
-          <label class="button" for="tileset-file" tabindex="0" role="button">📂 Charger</label>
+          <label class="button" for="tileset-file" tabindex="0" role="button">📂 Load</label>
           <input type="file" id="tileset-file" accept="image/png,.json,application/json" multiple hidden />
-          <button type="button" id="tileset-reset" hidden>↺ Par défaut</button>
-          <a class="button" href="/tiles.png" download="qrquest-modele.png">⬇ Modèle</a>
+          <button type="button" id="tileset-reset" hidden>↺ Default</button>
+          <a class="button" href="/tiles.png" download="qrquest-template.png">⬇ Template</a>
         </div>
       </fieldset>
 
       <fieldset>
-        <legend class="label">▶ Monde</legend>
+        <legend class="label">▶ World</legend>
         <div class="choices" id="themes"></div>
       </fieldset>
 
       <fieldset>
-        <legend class="label">▶ Résistance aux dégâts</legend>
+        <legend class="label">▶ Damage resistance</legend>
         <div class="choices" id="ecl">
-          <button type="button" data-ecl="L" title="~7 % de correction">L</button>
-          <button type="button" data-ecl="M" title="~15 % de correction">M</button>
-          <button type="button" data-ecl="Q" title="~25 % de correction">Q</button>
-          <button type="button" data-ecl="H" title="~30 % de correction">H</button>
+          <button type="button" data-ecl="L" title="~7% error correction">L</button>
+          <button type="button" data-ecl="M" title="~15% error correction">M</button>
+          <button type="button" data-ecl="Q" title="~25% error correction">Q</button>
+          <button type="button" data-ecl="H" title="~30% error correction">H</button>
         </div>
       </fieldset>
 
       <div class="actions">
-        <button type="button" id="reroll">🎲 Relancer la carte</button>
+        <button type="button" id="reroll">🎲 Reroll map</button>
         <div class="download">
-          <select id="scale" aria-label="Taille de l'image">
+          <select id="scale" aria-label="Image size">
             <option value="1">×1</option>
             <option value="2">×2</option>
             <option value="4" selected>×4</option>
             <option value="8">×8</option>
           </select>
-          <button type="button" id="download" class="primary">💾 Sauvegarder</button>
+          <button type="button" id="download" class="primary">💾 Save</button>
         </div>
       </div>
       <span class="caret" aria-hidden="true">▼</span>
     </section>
 
     <footer>
-      Tileset original CC0 · <a href="https://github.com/GMartigny/QRquest">GitHub</a>
+      Original CC0 tileset · <a href="https://github.com/GMartigny/QRquest">GitHub</a>
     </footer>
   </main>
   <script type="module" src="/src/main.js"></script>

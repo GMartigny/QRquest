@@ -89,14 +89,14 @@ function request(scale, signal) {
 }
 
 async function readError(res) {
-  try { return (await res.json()).error; } catch { return `Erreur ${res.status}`; }
+  try { return (await res.json()).error; } catch { return `Error ${res.status}`; }
 }
 
 let pending = null;
 async function render() {
   if (!state.tileset) return;
   const text = textEl.value;
-  if (!text) return showError("Il faut un message pour lancer la quête.");
+  if (!text) return showError("You need a message to start the quest.");
   pending?.abort();
   const controller = (pending = new AbortController());
   try {
@@ -114,13 +114,13 @@ async function render() {
     state.rendered = true;
     preview.alt = `QR code : ${text}`;
     const n = res.headers.get("X-QR-Modules");
-    $("#hud-level").textContent = `NIV. ${res.headers.get("X-QR-Version")}`;
+    $("#hud-level").textContent = `LV. ${res.headers.get("X-QR-Version")}`;
     $("#hud-size").textContent = `${n}×${n}`;
     store.set("text", text);
     store.set("theme", state.world);
     store.set("ecl", state.ecl);
   } catch (err) {
-    if (err.name !== "AbortError") showError("Impossible de joindre l'API de rendu.");
+    if (err.name !== "AbortError") showError("Could not reach the rendering API.");
   }
 }
 
@@ -166,7 +166,7 @@ $("#download").addEventListener("click", async () => {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   } catch {
-    showError("Impossible de joindre l'API de rendu.");
+    showError("Could not reach the rendering API.");
   } finally {
     button.disabled = false;
   }
@@ -181,22 +181,22 @@ const warningsEl = $("#tileset-warnings");
 
 function describe(tileset, name) {
   const n = tileset.worlds.length;
-  tilesetNameEl.textContent = `${name} · ${n} monde${n > 1 ? "s" : ""} · tuiles ${tileset.tile}px`;
+  tilesetNameEl.textContent = `${name} · ${n} world${n > 1 ? "s" : ""} · ${tileset.tile}px tiles`;
   // Contrast check between the average dark (walls) and light (ground) tiles
   const issues = tileset.worlds.filter((w) => w.contrast.level !== "good").map((w) => {
     const { delta, dark, light, inverted, level } = w.contrast;
     const li = document.createElement("li");
     li.className = level;
     li.textContent = inverted
-      ? `⚠ ${w.label} : les murs (${dark}) sont plus clairs que le sol (${light}). Le QR sera inversé, beaucoup de lecteurs le refuseront.`
-      : `⚠ ${w.label} : contraste ${level === "bad" ? "insuffisant" : "faible"} entre murs et sol (écart ${delta}/255, conseillé ≥ 140). Le QR risque de ne pas se lire.`;
+      ? `⚠ ${w.label}: walls (${dark}) are lighter than the ground (${light}). The QR code will be inverted and many scanners will reject it.`
+      : `⚠ ${w.label}: ${level === "bad" ? "insufficient" : "weak"} contrast between walls and ground (gap ${delta}/255, ≥ 140 recommended). The QR code may not scan.`;
     return li;
   });
   warningsEl.replaceChildren(...issues);
   warningsEl.hidden = !issues.length;
 }
 
-// the visible "Charger" label opens the hidden file input from the keyboard too
+// the visible "Load" label opens the hidden file input from the keyboard too
 document.querySelector('label[for="tileset-file"]').addEventListener("keydown", (e) => {
   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileEl.click(); }
 });
@@ -206,8 +206,8 @@ fileEl.addEventListener("change", async () => {
   fileEl.value = "";
   const png = files.find((f) => f.type.startsWith("image/"));
   const json = files.find((f) => f.name.endsWith(".json"));
-  if (!png) return showError("Choisis une image PNG (et éventuellement son fichier .json de noms).");
-  if (png.size > MAX_UPLOAD) return showError("Tileset trop lourd : 4 Mo maximum.");
+  if (!png) return showError("Pick a PNG image (and optionally its .json names file).");
+  if (png.size > MAX_UPLOAD) return showError("Tileset too large: 4 MB max.");
   const url = URL.createObjectURL(png);
   try {
     const manifest = json ? JSON.parse(await json.text()) : {};
@@ -218,18 +218,18 @@ fileEl.addEventListener("change", async () => {
     resetEl.hidden = false;
   } catch (err) {
     URL.revokeObjectURL(url);
-    showError(`Tileset invalide : ${err.message}`);
+    showError(`Invalid tileset: ${err.message}`);
   }
 });
 
 resetEl.addEventListener("click", async () => {
   const loaded = await defaultTileset();
   useTileset(loaded);
-  describe(loaded.tileset, "Par défaut");
+  describe(loaded.tileset, "Default");
   resetEl.hidden = true;
 });
 
 syncButtons();
 defaultTileset()
-  .then((loaded) => { useTileset(loaded); describe(loaded.tileset, "Par défaut"); })
-  .catch((err) => showError(`Tileset invalide : ${err.message}`));
+  .then((loaded) => { useTileset(loaded); describe(loaded.tileset, "Default"); })
+  .catch((err) => showError(`Invalid tileset: ${err.message}`));

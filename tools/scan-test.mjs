@@ -16,7 +16,7 @@ const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath
 const tileset = analyzeTileset(sheet, manifest);
 for (const w of tileset.worlds) {
   const c = w.contrast;
-  console.log(`${w.label}: ${w.ground.plain.length}+${w.ground.decor.length} sols, ${w.props.length} habitants, ${w.landmarks.length} bâtiments, contraste ${c.delta}/255 (${c.level})`);
+  console.log(`${w.label}: ${w.ground.plain.length}+${w.ground.decor.length} grounds, ${w.props.length} inhabitants, ${w.landmarks.length} landmarks, contrast ${c.delta}/255 (${c.level})`);
 }
 
 function render(map) {
@@ -38,8 +38,8 @@ function downscale(png, f) {
 const FACTORS = [2, 3, 4].map((f) => Math.max(1, Math.round((f * tileset.tile) / 16)));
 const samples = [
   "https://github.com/GMartigny/QRquest",
-  "Bonjour, aventurier ! Ta quête commence ici. ⚔️",
-  "WIFI:T:WPA;S:Taverne;P:hydromel-42;;",
+  "Héllo, adventurer! Your quest starts here. ⚔️",
+  "WIFI:T:WPA;S:Tavern;P:mead-42;;",
   "x".repeat(300),
 ];
 

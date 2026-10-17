@@ -11,17 +11,17 @@ import {
 const TILE = 16;
 const THEMES = [
   {
-    id: "forest", label: "Forêt", shadow: "#0b2a1266",
+    id: "forest", label: "Forest", shadow: "#0b2a1266",
     props: { ground: ["sign", "mushroom", "rabbit"], wall: ["apples", "owl", "cardinal"], "wall-front": [] },
     landmarks: { 3: ["tavern", "oak"], 2: ["well", "campfire"] },
   },
   {
-    id: "dungeon", label: "Donjon", shadow: "#3a280c55",
+    id: "dungeon", label: "Dungeon", shadow: "#3a280c55",
     props: { ground: ["skull", "potion", "key"], wall: ["cobweb"], "wall-front": ["torch", "banner"] },
     landmarks: { 3: ["crypt", "altar"], 2: ["chest", "slime"] },
   },
   {
-    id: "snow", label: "Toundra", shadow: "#1a3a6044",
+    id: "snow", label: "Tundra", shadow: "#1a3a6044",
     props: { ground: ["fox", "snowman", "sled"], wall: ["squirrel", "robin"], "wall-front": ["lantern"] },
     landmarks: { 3: ["igloo", "crevasse"], 2: ["icehole", "rock"] },
   },
@@ -384,6 +384,6 @@ writeFileSync(new URL("../public/tiles.json", import.meta.url), JSON.stringify({
 // Sanity check: what the app will discover from this sheet
 const found = analyzeTileset(png, { worlds: THEMES.map((t) => t.label) });
 for (const w of found.worlds) {
-  console.log(`${w.label}: ${w.ground.plain.length}+${w.ground.decor.length} sols, ${w.props.length} habitants, ${w.landmarks.length} bâtiments`);
+  console.log(`${w.label}: ${w.ground.plain.length}+${w.ground.decor.length} grounds, ${w.props.length} inhabitants, ${w.landmarks.length} landmarks`);
 }
 console.log(`public/tiles.png ${width}×${height}`);

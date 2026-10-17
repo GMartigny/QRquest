@@ -23,7 +23,7 @@
 // is covered by any wall to its right or below, and shadows that are the wall
 // shape shifted down-right never overlap each other.
 //
-// World names are read from an optional tiles.json: { "worlds": ["Forêt", …] }.
+// World names are read from an optional tiles.json: { "worlds": ["Forest", …] }.
 
 export const COLUMNS = 16;
 export const ROWS_PER_WORLD = 13;
@@ -60,11 +60,11 @@ export function analyzeTileset(image, manifest = {}) {
   const { width, height, data } = image;
   const tile = width / COLUMNS;
   if (!Number.isInteger(tile) || tile < 4) {
-    throw new Error(`La largeur du tileset (${width}px) doit être 16 × la taille d'une tuile.`);
+    throw new Error(`Tileset width (${width}px) must be 16 × the tile size.`);
   }
   const worldCount = Math.floor(height / (tile * ROWS_PER_WORLD));
   if (worldCount < 1) {
-    throw new Error(`Le tileset doit faire au moins ${tile * ROWS_PER_WORLD}px de haut (${ROWS_PER_WORLD} rangées de tuiles par monde).`);
+    throw new Error(`The tileset must be at least ${tile * ROWS_PER_WORLD}px tall (${ROWS_PER_WORLD} tile rows per world).`);
   }
 
   // Is any pixel of the area (in tile units) not fully transparent?
@@ -112,7 +112,7 @@ export function analyzeTileset(image, manifest = {}) {
     const missing = masks.filter((m) => !slotFilled(base + ROW.wall, m));
     const plain = range(GROUND_SLOTS.plain, base + ROW.ground);
     if (missing.length || !plain.length) {
-      throw new Error(`Monde ${w + 1} : ${missing.length ? `tuiles de mur manquantes (${missing.join(", ")})` : "aucune tuile de sol simple"}.`);
+      throw new Error(`World ${w + 1}: ${missing.length ? `missing wall tiles (${missing.join(", ")})` : "no plain ground tile"}.`);
     }
     const specialComplete = masks.every((m) => slotFilled(base + ROW.special, m));
 
@@ -138,7 +138,7 @@ export function analyzeTileset(image, manifest = {}) {
 
     worlds.push({
       index: w,
-      label: manifest.worlds?.[w] || `Monde ${w + 1}`,
+      label: manifest.worlds?.[w] || `World ${w + 1}`,
       rows: {
         wall: base + ROW.wall,
         special: base + (specialComplete ? ROW.special : ROW.wall),
