@@ -1,161 +1,161 @@
 # QRquest
 
-Générateur de QR codes en pixel art : chaque module du QR devient une tuile d'un décor de RPG 2D (forêt, donjon, toundra), avec autotiling pour que les murs se raccordent.
+A pixel-art QR code generator: every module of the QR code becomes a tile of a 2D RPG map (forest, dungeon, tundra), with autotiling so that walls connect to each other.
 
-## Lancer
+## Getting started
 
 ```bash
 npm install
-npm run dev      # serveur local (site + webservice sur /api/qr)
-npm run build    # build de production dans dist/
-npm test         # vérifie qu'au moins 99 % des QR rendus se décodent (jsQR)
-npm run tiles    # régénère public/tiles.png
+npm run dev      # local server (site + web service on /api/qr)
+npm run build    # production build in dist/
+npm test         # checks that at least 99% of rendered QR codes decode (jsQR)
+npm run tiles    # regenerates public/tiles.png
 ```
 
-## Webservice
+## Web service
 
-Le rendu des QR codes est fait côté serveur par un webservice : `api/qr.js`, déployé comme fonction Vercel. Le site l'utilise pour l'aperçu et le téléchargement, et il est ouvert à tous. On peut l'appeler depuis un autre site, un script ou une simple balise `<img>`.
+QR codes are rendered server-side by a web service: `api/qr.js`, deployed as a Vercel function. The site uses it for the preview and the download, and it is open to everyone: you can call it from another site, a script or a plain `<img>` tag.
 
-- **URL** : `https://qrquest-rpg.vercel.app/api/qr`
-- **En local** : `npm run dev` sert le même webservice sur `http://localhost:5173/api/qr`.
+- **URL**: `https://qrquest-rpg.vercel.app/api/qr`
+- **Locally**: `npm run dev` serves the same web service at `http://localhost:5173/api/qr`.
 
-### Deux façons de l'appeler
+### Two ways to call it
 
-| Méthode | Tileset utilisé | Corps de la requête |
+| Method | Tileset used | Request body |
 | --- | --- | --- |
-| `GET` | celui du site (`public/tiles.png`) | aucun |
-| `POST` | le tien | le fichier PNG du tileset (4 Mo max) |
+| `GET` | the site's own (`public/tiles.png`) | none |
+| `POST` | yours | the tileset PNG file (4 MB max) |
 
-Dans les deux cas, les options passent dans l'URL (query string).
+In both cases, options go in the URL (query string).
 
-### Paramètres
+### Parameters
 
-| Paramètre | Si absent | Rôle |
+| Parameter | If missing | Purpose |
 | --- | --- | --- |
-| `text` | **obligatoire** | contenu du QR code (1200 caractères max, UTF-8 : accents et emoji acceptés) |
-| `world` | `0` (premier monde) | index du monde (`0`, `1`…) ou son nom, sans tenir compte de la casse (`Donjon`, `toundra`…) |
-| `ecl` | `Q` | niveau de correction d'erreur : `L` (~7 %), `M` (~15 %), `Q` (~25 %), `H` (~30 %). Plus il est élevé, plus le QR est grand, et plus il peut accueillir de bâtiments |
-| `seed` | `1` | graine du décor. Les mêmes paramètres donnent toujours la même image ; change la graine pour un autre agencement |
-| `scale` | `1` | agrandissement entier, sans flou, de 1 à 8. Ramené automatiquement dans cette plage, et plafonné pour que l'image ne dépasse pas 4096 px |
-| `names` | « Monde 1 », « Monde 2 »… | `POST` uniquement : noms des mondes du tileset envoyé, séparés par des virgules |
+| `text` | **required** | content of the QR code (1200 characters max, UTF-8: accents and emoji are fine) |
+| `world` | `0` (first world) | world index (`0`, `1`…) or its name, case-insensitive (`Donjon`, `toundra`…) |
+| `ecl` | `Q` | error correction level: `L` (~7%), `M` (~15%), `Q` (~25%), `H` (~30%). The higher it is, the bigger the QR code and the more landmarks it can hold |
+| `seed` | `1` | map seed. The same parameters always give the same image; change the seed for a different layout |
+| `scale` | `1` | integer, blur-free upscale from 1 to 8. Clamped to that range automatically, and capped so the image never exceeds 4096 px |
+| `names` | "Monde 1", "Monde 2"… | `POST` only: names of the uploaded tileset's worlds, comma-separated |
 
-Les réglages de densité (décorations, habitants, bâtiments) ne sont pas des paramètres. La part de modules couverte par les bâtiments dépend seulement de `ecl` (voir [Fonctionnement](#fonctionnement)).
+Density settings (decorations, inhabitants, landmarks) are not parameters. The share of modules covered by landmarks depends on `ecl` only (see [How it works](#how-it-works)).
 
-### Réponse
+### Response
 
-En cas de succès : code `200`, corps au format `image/png`, et ces en-têtes :
+On success: status `200`, an `image/png` body, and these headers:
 
-| En-tête | Contenu |
+| Header | Content |
 | --- | --- |
-| `X-QR-Version` | version du QR code (1 à 40) |
-| `X-QR-Modules` | nombre de modules par côté (21 pour la version 1, +4 par version) |
-| `X-QR-World` | nom du monde utilisé, encodé pour une URL (`encodeURIComponent`) |
-| `X-QR-Worlds` | nombre de mondes dans le tileset |
+| `X-QR-Version` | QR code version (1 to 40) |
+| `X-QR-Modules` | modules per side (21 for version 1, +4 per version) |
+| `X-QR-World` | name of the world used, URL-encoded (`encodeURIComponent`) |
+| `X-QR-Worlds` | number of worlds in the tileset |
 
-L'image fait `(modules + 4) × taille de tuile × scale` pixels de côté : le QR plus une marge de 2 modules de chaque côté. Avec le tileset par défaut (tuiles de 16 px), un QR de 33 modules à `scale=1` fait 592 px.
+The image is `(modules + 4) × tile size × scale` pixels wide: the QR code plus a 2-module margin on each side. With the default tileset (16 px tiles), a 33-module QR code at `scale=1` is 592 px wide.
 
-### Erreurs
+### Errors
 
-En cas d'erreur, le corps est en JSON, `{ "error": "message en français" }` :
+On error, the body is JSON, `{ "error": "message" }` (messages are in French):
 
-| Code | Cas |
+| Status | When |
 | --- | --- |
-| `400` | `text` manquant ou trop long, `ecl` invalide, monde inconnu, corps `POST` vide ou pas un PNG, texte trop long pour le niveau de correction |
-| `405` | méthode autre que `GET`, `POST` ou `OPTIONS` |
-| `413` | tileset de plus de 4 Mo (Vercel refuse lui-même les corps de plus de 4,5 Mo) |
-| `422` | PNG lisible mais pas au format tileset, par exemple largeur incorrecte ou murs manquants (voir [Tileset](#tileset)) |
-| `500` | erreur interne inattendue |
+| `400` | `text` missing or too long, invalid `ecl`, unknown world, empty `POST` body or not a PNG, text too long for the correction level |
+| `405` | method other than `GET`, `POST` or `OPTIONS` |
+| `413` | tileset over 4 MB (Vercel itself rejects bodies over 4.5 MB) |
+| `422` | readable PNG that isn't a valid tileset, e.g. wrong width or missing walls (see [Tileset](#tileset)) |
+| `500` | unexpected internal error |
 
-### Cache et CORS
+### Cache and CORS
 
-- **Cache** : les réponses `GET` peuvent être mises en cache (1 h dans le navigateur, longtemps sur le CDN de Vercel), puisque les mêmes paramètres donnent la même image. Les réponses `POST` ne sont jamais mises en cache.
-- **CORS** : ouvert à toutes les origines (`Access-Control-Allow-Origin: *`). Les en-têtes `X-QR-*` sont lisibles en JavaScript depuis n'importe quel site.
+- **Cache**: `GET` responses can be cached (1 h in the browser, long-term on Vercel's CDN), since the same parameters give the same image. `POST` responses are never cached.
+- **CORS**: open to all origins (`Access-Control-Allow-Origin: *`). The `X-QR-*` headers are readable from JavaScript on any site.
 
-### Exemples
+### Examples
 
-Dans une page HTML, avec le tileset par défaut :
+In an HTML page, with the default tileset:
 
 ```html
-<img src="https://qrquest-rpg.vercel.app/api/qr?text=https%3A%2F%2Fexemple.fr&world=Toundra&scale=2"
-     alt="QR code vers exemple.fr" style="image-rendering: pixelated">
+<img src="https://qrquest-rpg.vercel.app/api/qr?text=https%3A%2F%2Fexample.com&world=Toundra&scale=2"
+     alt="QR code to example.com" style="image-rendering: pixelated">
 ```
 
-En ligne de commande :
+From the command line:
 
 ```bash
-# tileset par défaut
-curl -o qr.png "https://qrquest-rpg.vercel.app/api/qr?text=Bonjour&world=Donjon&ecl=H&scale=4"
+# default tileset
+curl -o qr.png "https://qrquest-rpg.vercel.app/api/qr?text=Hello&world=Donjon&ecl=H&scale=4"
 
-# tileset personnel, avec les noms de ses mondes
-curl -o qr.png --data-binary @mon-tileset.png -H "Content-Type: image/png" \
-  "https://qrquest-rpg.vercel.app/api/qr?text=Bonjour&world=Volcan&names=Plage,Volcan"
+# your own tileset, with its world names
+curl -o qr.png --data-binary @my-tileset.png -H "Content-Type: image/png" \
+  "https://qrquest-rpg.vercel.app/api/qr?text=Hello&world=Volcano&names=Beach,Volcano"
 ```
 
-En JavaScript, avec un tileset choisi par l'utilisateur :
+In JavaScript, with a tileset picked by the user:
 
 ```js
-const params = new URLSearchParams({ text: "Bonjour", world: 0, ecl: "Q", scale: 4 });
+const params = new URLSearchParams({ text: "Hello", world: 0, ecl: "Q", scale: 4 });
 const res = await fetch(`https://qrquest-rpg.vercel.app/api/qr?${params}`, {
   method: "POST",
   headers: { "Content-Type": "image/png" },
-  body: fileInput.files[0], // le PNG du tileset
+  body: fileInput.files[0], // the tileset PNG
 });
 if (!res.ok) throw new Error((await res.json()).error);
 console.log("Version", res.headers.get("X-QR-Version"));
 img.src = URL.createObjectURL(await res.blob());
 ```
 
-### Limites
+### Limits
 
-- **Texte** : 1200 caractères. La vraie limite est en octets UTF-8 : un accent compte pour 2 octets, un emoji pour 4. 1200 caractères sans accent tiennent même en `H`, mais en `H` un texte entièrement accentué ne dépasse pas environ 630 caractères. Au-delà, l'API renvoie une erreur 400 « Texte trop long pour ce niveau de correction ».
-- **Tileset envoyé** : 4 Mo maximum.
-- **Image** : 4096 px de côté au maximum. `scale` est réduit si besoin.
-- **Lecture** : les bâtiments utilisent une partie de la correction d'erreur. Au test (jsQR), au moins 99 % des QR générés se lisent. Pour une lecture la plus sûre possible, préfère `ecl=H`.
+- **Text**: 1200 characters. The real limit is in UTF-8 bytes: an accented letter counts as 2 bytes, an emoji as 4. 1200 unaccented characters fit even at `H`, but at `H` a fully accented text tops out around 630 characters. Beyond that, the API returns a 400 error ("Texte trop long pour ce niveau de correction").
+- **Uploaded tileset**: 4 MB max.
+- **Image**: 4096 px per side max. `scale` is reduced if needed.
+- **Scanning**: landmarks use up part of the error correction. In tests (jsQR), at least 99% of generated QR codes decode. For the most reliable scanning, prefer `ecl=H`.
 
-## Fonctionnement
+## How it works
 
-- `src/qrmap.js` (partagé par l'API et les outils) encode le texte (UTF-8) avec `qrcode-generator`, puis transforme la matrice en opérations de dessin : une tuile de sol sous chaque case, et pour chaque module sombre une tuile de mur choisie selon ses voisins (masque N=1, E=2, S=4, O=8 → 16 variantes).
-- Les motifs de repérage (coins) et d'alignement utilisent une famille de tuiles « spéciale » (ruines, obsidienne, glace).
-- Le sol varie aléatoirement (graine relançable) avec quelques décorations.
-- Chaque monde a ses habitants : panneau, champignon, lapin, chouette… en forêt ; crâne, potion, clé, torche, bannière, toile d’araignée au donjon ; renard blanc, bonhomme de neige, luge, lanterne, écureuil, rouge-gorge en toundra. Ils sont placés au hasard sur des cases sûres : clairière (sol entouré de sol, loin des motifs de repérage), mur, ou façade de mur (rien en dessous). `npm run tiles` vérifie qu’aucun ne change la luminosité de sa case.
-- Quelques bâtiments 2×2 ou 3×3 (taverne, grand chêne, puits, feu de camp ; crypte, autel, coffre, slime ; igloo, crevasse, trou de pêche, rocher) sont posés n’importe où, sans tenir compte des modules dessous : c’est la correction d’erreur qui compense. Ils évitent seulement ce que le décodeur lit hors correction (repérage + format, lignes de timing, alignement, version) et couvrent une part des modules qui progresse linéairement avec le niveau : 1,5 % en L, 3,5 % en M, 5,5 % en Q, 7,5 % en H (≥ 99 % de QR lus par jsQR à chaque niveau).
+- `src/qrmap.js` (shared by the API and the tools) encodes the text (UTF-8) with `qrcode-generator`, then turns the matrix into draw operations: a ground tile under every cell, and for each dark module a wall tile picked from its neighbours (mask N=1, E=2, S=4, W=8 → 16 variants).
+- Finder (corner) and alignment patterns use a "special" tile family (ruins, obsidian, ice).
+- The ground varies randomly (re-rollable seed) with a few decorations.
+- Each world has its inhabitants: sign, mushroom, rabbit, owl… in the forest; skull, potion, key, torch, banner, cobweb in the dungeon; white fox, snowman, sled, lantern, squirrel, robin in the tundra. They are placed at random on safe cells: a clearing (ground surrounded by ground, away from finder patterns), a wall, or a wall front (nothing below). `npm run tiles` checks that none of them changes its cell's brightness.
+- A few 2×2 or 3×3 landmarks (tavern, big oak, well, campfire; crypt, altar, chest, slime; igloo, crevasse, ice-fishing hole, rock) are placed anywhere, regardless of the modules underneath: error correction makes up for them. They only avoid what the decoder reads outside error correction (finder + format info, timing lines, alignment, version info) and cover a share of modules that grows linearly with the level: 1.5% at L, 3.5% at M, 5.5% at Q, 7.5% at H (≥ 99% of QR codes decoded by jsQR at every level).
 
 ## Tileset
 
-Le tileset se remplace sans toucher au code. Dans l'interface, **📂 Charger** utilise ton PNG (sélectionne aussi son `.json` pour nommer les mondes) le temps de la session, et **⬇ Modèle** télécharge le tileset par défaut comme point de départ. Le PNG est envoyé à l'API pour le rendu, et l'analyse (mondes, contraste) se fait aussi dans le navigateur pour l'interface. Pour changer le tileset du site, déposer un autre `public/tiles.png` (et éventuellement `public/tiles.json`). L'application lit l'image et en déduit tout le reste :
+The tileset can be swapped without touching the code. In the interface, **📂 Charger** (load) uses your PNG for the session (also select its `.json` to name the worlds), and **⬇ Modèle** (template) downloads the default tileset as a starting point. The PNG is sent to the API for rendering, and it is also analysed in the browser for the interface (worlds, contrast). To change the site's tileset, drop in another `public/tiles.png` (and optionally `public/tiles.json`). The app reads the image and works out everything else:
 
-- **taille des tuiles** = largeur ÷ 16 (16 px, 32 px…) ;
-- **nombre de mondes** = hauteur ÷ (13 × taille de tuile) — une bande de 13 rangées par monde ;
-- **sols, habitants et bâtiments** : chaque case est un emplacement, utilisé seulement s'il n'est pas entièrement transparent. Chaque monde peut donc en avoir un nombre différent.
+- **tile size** = width ÷ 16 (16 px, 32 px…);
+- **number of worlds** = height ÷ (13 × tile size): one band of 13 rows per world;
+- **ground, inhabitants and landmarks**: each cell is a slot, used only if it isn't fully transparent. So each world can have a different number of them.
 
-Organisation d'une bande (colonnes 0 à 15) :
+Layout of a band (columns 0 to 15):
 
-| Rangées | Contenu |
+| Rows | Content |
 | --- | --- |
-| 0-3 | **murs (obligatoire)** : 16 emplacements de 2×2 tuiles, 8 par paire de rangées, index = masque des voisins (N=1, E=2, S=4, O=8). Le module est la tuile en haut à gauche de l'emplacement ; le reste reçoit ce qui déborde en bas et à droite (ombre portée semi-transparente) |
-| 4-7 | murs « spéciaux » des carrés de repérage, même organisation (vide → murs normaux) |
-| 8 | sol : colonnes 0-7 variantes simples (au moins une), 8-15 variantes décorées |
-| 9 | habitants : colonnes 0-7 sur le sol, 8-11 sur un mur, 12-15 sur une façade de mur (rien en dessous) |
-| 10-12 | bâtiments : emplacements 3×3 aux colonnes 0, 3 et 6 ; emplacements 2×2 aux colonnes 9, 11 et 13 (rangées 10-11) |
+| 0-3 | **walls (required)**: 16 slots of 2×2 tiles, 8 per row pair, index = neighbour mask (N=1, E=2, S=4, W=8). The module is the slot's top-left tile; the rest holds what spills down and to the right (semi-transparent cast shadow) |
+| 4-7 | "special" walls for finder patterns, same layout (empty → regular walls are used) |
+| 8 | ground: columns 0-7 plain variants (at least one), 8-15 decorated variants |
+| 9 | inhabitants: columns 0-7 on the ground, 8-11 on a wall, 12-15 on a wall front (nothing below) |
+| 10-12 | landmarks: 3×3 slots at columns 0, 3 and 6; 2×2 slots at columns 9, 11 and 13 (rows 10-11) |
 
-Noms des mondes (optionnel, sinon « Monde 1 », « Monde 2 »…) dans `public/tiles.json` :
+World names (optional, otherwise "Monde 1", "Monde 2"…) go in `public/tiles.json`:
 
 ```json
 { "worlds": ["Forêt", "Donjon", "Toundra"] }
 ```
 
-**Rendu 2.5D** : tout le sol est dessiné d'abord, puis les murs ligne par ligne. Un mur déborde donc sur le sol voisin (ombre), et ce débordement est recouvert par tout mur situé à droite ou en dessous. Si l'ombre est la forme du mur décalée en bas à droite, deux ombres ne se superposent jamais. Dans le tileset par défaut, seuls les carrés de repérage et d'alignement sont des murs en relief : façade verticale quand rien n'est en dessous, et ombre portée. Les autres cases sombres sont des tuiles plates. Les bâtiments debout portent la même ombre que les murs, dessinée dans leur emplacement (la crevasse et le trou de pêche, à plat, n'en ont pas).
+**2.5D rendering**: all the ground is drawn first, then the walls row by row. A wall therefore spills onto the neighbouring ground (shadow), and that spill is covered by any wall to its right or below. If the shadow is the wall's shape shifted down and to the right, two shadows never overlap. In the default tileset, only finder and alignment patterns are raised walls: a vertical front face when nothing is below, and a cast shadow. The other dark cells are flat tiles. Standing landmarks cast the same shadow as walls, drawn inside their slot (the crevasse and the ice-fishing hole, lying flat, have none).
 
-La transparence partielle (canal alpha) est prise en compte, par exemple pour un slime ou de la glace.
+Partial transparency (alpha channel) is supported, for example for a slime or ice.
 
-La couleur d'accent de l'interface est tirée de la couleur des murs de chaque monde.
+The interface accent colour is taken from each world's wall colour.
 
-Au chargement, l'app compare la luminosité moyenne des murs (cases sombres) et du sol simple (cases claires) de chaque monde, et avertit si l'écart est faible (< 140/255), insuffisant (< 100/255) ou inversé. Ces seuils viennent de mesures avec jsQR : ≥ 140 se lit de façon fiable, la lecture chute nettement en dessous.
+On load, the app compares the average brightness of the walls (dark cells) and the plain ground (light cells) of each world, and warns if the gap is weak (< 140/255), insufficient (< 100/255) or inverted. These thresholds come from measurements with jsQR: ≥ 140 reads reliably, and decoding drops sharply below.
 
-Pour vérifier un tileset maison en ligne de commande : `node tools/scan-test.mjs chemin/vers/tiles.png` affiche ce qui a été détecté, le contraste et le taux de QR lus. Garder des murs sombres, un sol clair et des habitants qui respectent la luminosité de leur case : c'est ce contraste qui rend le QR scannable.
+To check a custom tileset from the command line: `node tools/scan-test.mjs path/to/tiles.png` prints what was detected, the contrast and the decode rate. Keep walls dark, ground light, and inhabitants that respect their cell's brightness: that contrast is what makes the QR code scannable.
 
-Le tileset par défaut est généré par `npm run tiles` (`tools/generate-tiles.mjs`) et placé dans le domaine public (CC0).
+The default tileset is generated by `npm run tiles` (`tools/generate-tiles.mjs`) and dedicated to the public domain (CC0).
 
-## Licence
+## License
 
-Code sous licence MIT, tileset CC0.
+Code under the MIT license, tileset under CC0.
