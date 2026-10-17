@@ -6,35 +6,111 @@ Générateur de QR codes en pixel art : chaque module du QR devient une tuile d'
 
 ```bash
 npm install
-npm run dev      # serveur local (site + API sur /api/qr)
+npm run dev      # serveur local (site + webservice sur /api/qr)
 npm run build    # build de production dans dist/
 npm test         # vérifie qu'au moins 99 % des QR rendus se décodent (jsQR)
 npm run tiles    # régénère public/tiles.png
 ```
 
-## API
+## Webservice
 
-Le rendu se fait côté serveur, dans `api/qr.js` (fonction Vercel). Le site l'appelle, et n'importe qui peut l'utiliser directement :
+Le rendu des QR codes est fait côté serveur par un webservice : `api/qr.js`, déployé comme fonction Vercel. Le site l'utilise pour l'aperçu et le téléchargement, et il est ouvert à tous. On peut l'appeler depuis un autre site, un script ou une simple balise `<img>`.
 
-```bash
-# tileset par défaut → PNG
-curl -o qr.png "https://qrquest-rpg.vercel.app/api/qr?text=Bonjour&world=Donjon&ecl=H&scale=4"
+- **URL** : `https://qrquest-rpg.vercel.app/api/qr`
+- **En local** : `npm run dev` sert le même webservice sur `http://localhost:5173/api/qr`.
 
-# tileset personnel (corps = PNG, 4 Mo max), noms des mondes optionnels
-curl -o qr.png --data-binary @mon-tileset.png -H "Content-Type: image/png" \
-  "https://qrquest-rpg.vercel.app/api/qr?text=Bonjour&world=0&names=Plage,Volcan"
+### Deux façons de l'appeler
+
+| Méthode | Tileset utilisé | Corps de la requête |
+| --- | --- | --- |
+| `GET` | celui du site (`public/tiles.png`) | aucun |
+| `POST` | le tien | le fichier PNG du tileset (4 Mo max) |
+
+Dans les deux cas, les options passent dans l'URL (query string).
+
+### Paramètres
+
+| Paramètre | Si absent | Rôle |
+| --- | --- | --- |
+| `text` | **obligatoire** | contenu du QR code (1200 caractères max, UTF-8 : accents et emoji acceptés) |
+| `world` | `0` (premier monde) | index du monde (`0`, `1`…) ou son nom, sans tenir compte de la casse (`Donjon`, `toundra`…) |
+| `ecl` | `Q` | niveau de correction d'erreur : `L` (~7 %), `M` (~15 %), `Q` (~25 %), `H` (~30 %). Plus il est élevé, plus le QR est grand, et plus il peut accueillir de bâtiments |
+| `seed` | `1` | graine du décor. Les mêmes paramètres donnent toujours la même image ; change la graine pour un autre agencement |
+| `scale` | `1` | agrandissement entier, sans flou, de 1 à 8. Ramené automatiquement dans cette plage, et plafonné pour que l'image ne dépasse pas 4096 px |
+| `names` | « Monde 1 », « Monde 2 »… | `POST` uniquement : noms des mondes du tileset envoyé, séparés par des virgules |
+
+Les réglages de densité (décorations, habitants, bâtiments) ne sont pas des paramètres. La part de modules couverte par les bâtiments dépend seulement de `ecl` (voir [Fonctionnement](#fonctionnement)).
+
+### Réponse
+
+En cas de succès : code `200`, corps au format `image/png`, et ces en-têtes :
+
+| En-tête | Contenu |
+| --- | --- |
+| `X-QR-Version` | version du QR code (1 à 40) |
+| `X-QR-Modules` | nombre de modules par côté (21 pour la version 1, +4 par version) |
+| `X-QR-World` | nom du monde utilisé, encodé pour une URL (`encodeURIComponent`) |
+| `X-QR-Worlds` | nombre de mondes dans le tileset |
+
+L'image fait `(modules + 4) × taille de tuile × scale` pixels de côté : le QR plus une marge de 2 modules de chaque côté. Avec le tileset par défaut (tuiles de 16 px), un QR de 33 modules à `scale=1` fait 592 px.
+
+### Erreurs
+
+En cas d'erreur, le corps est en JSON, `{ "error": "message en français" }` :
+
+| Code | Cas |
+| --- | --- |
+| `400` | `text` manquant ou trop long, `ecl` invalide, monde inconnu, corps `POST` vide ou pas un PNG, texte trop long pour le niveau de correction |
+| `405` | méthode autre que `GET`, `POST` ou `OPTIONS` |
+| `413` | tileset de plus de 4 Mo (Vercel refuse lui-même les corps de plus de 4,5 Mo) |
+| `422` | PNG lisible mais pas au format tileset, par exemple largeur incorrecte ou murs manquants (voir [Tileset](#tileset)) |
+| `500` | erreur interne inattendue |
+
+### Cache et CORS
+
+- **Cache** : les réponses `GET` peuvent être mises en cache (1 h dans le navigateur, longtemps sur le CDN de Vercel), puisque les mêmes paramètres donnent la même image. Les réponses `POST` ne sont jamais mises en cache.
+- **CORS** : ouvert à toutes les origines (`Access-Control-Allow-Origin: *`). Les en-têtes `X-QR-*` sont lisibles en JavaScript depuis n'importe quel site.
+
+### Exemples
+
+Dans une page HTML, avec le tileset par défaut :
+
+```html
+<img src="https://qrquest-rpg.vercel.app/api/qr?text=https%3A%2F%2Fexemple.fr&world=Toundra&scale=2"
+     alt="QR code vers exemple.fr" style="image-rendering: pixelated">
 ```
 
-| Paramètre | Défaut | Rôle |
-| --- | --- | --- |
-| `text` | — | contenu du QR (1200 caractères max) |
-| `world` | `0` | index du monde ou son nom |
-| `ecl` | `Q` | correction d'erreur : `L`, `M`, `Q` ou `H` |
-| `seed` | `1` | graine du décor (mêmes paramètres → même image) |
-| `scale` | `1` | agrandissement entier de 1 à 8 (image limitée à 4096 px) |
-| `names` | — | (POST) noms des mondes séparés par des virgules |
+En ligne de commande :
 
-La réponse est un `image/png` avec les en-têtes `X-QR-Version`, `X-QR-Modules`, `X-QR-World` et `X-QR-Worlds`. En cas d'erreur, l'API renvoie `{ "error": "…" }` avec un code 4xx. Les réponses GET sont mises en cache, et CORS est ouvert.
+```bash
+# tileset par défaut
+curl -o qr.png "https://qrquest-rpg.vercel.app/api/qr?text=Bonjour&world=Donjon&ecl=H&scale=4"
+
+# tileset personnel, avec les noms de ses mondes
+curl -o qr.png --data-binary @mon-tileset.png -H "Content-Type: image/png" \
+  "https://qrquest-rpg.vercel.app/api/qr?text=Bonjour&world=Volcan&names=Plage,Volcan"
+```
+
+En JavaScript, avec un tileset choisi par l'utilisateur :
+
+```js
+const params = new URLSearchParams({ text: "Bonjour", world: 0, ecl: "Q", scale: 4 });
+const res = await fetch(`https://qrquest-rpg.vercel.app/api/qr?${params}`, {
+  method: "POST",
+  headers: { "Content-Type": "image/png" },
+  body: fileInput.files[0], // le PNG du tileset
+});
+if (!res.ok) throw new Error((await res.json()).error);
+console.log("Version", res.headers.get("X-QR-Version"));
+img.src = URL.createObjectURL(await res.blob());
+```
+
+### Limites
+
+- **Texte** : 1200 caractères. La vraie limite est en octets UTF-8 : un accent compte pour 2 octets, un emoji pour 4. 1200 caractères sans accent tiennent même en `H`, mais en `H` un texte entièrement accentué ne dépasse pas environ 630 caractères. Au-delà, l'API renvoie une erreur 400 « Texte trop long pour ce niveau de correction ».
+- **Tileset envoyé** : 4 Mo maximum.
+- **Image** : 4096 px de côté au maximum. `scale` est réduit si besoin.
+- **Lecture** : les bâtiments utilisent une partie de la correction d'erreur. Au test (jsQR), au moins 99 % des QR générés se lisent. Pour une lecture la plus sûre possible, préfère `ecl=H`.
 
 ## Fonctionnement
 
